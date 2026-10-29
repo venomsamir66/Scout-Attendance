@@ -1,7 +1,7 @@
 // Minimal service worker: lets the leader screen install as an app and open fast.
 // Network first, so you always get the newest files; the cache is only a fallback.
 // Check-in requests to Google are never cached.
-const CACHE = "scout-leader-v1";
+const CACHE = "scout-leader-v2";
 const SHELL = ["./display.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {

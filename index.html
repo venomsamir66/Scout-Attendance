@@ -331,6 +331,10 @@
   .when { font-size: .78rem; color: hsl(var(--hue) 20% 65%); font-weight: 500; }
   .done-msg { font-size: 1.15rem; font-weight: 700; color: var(--ink); margin-bottom: .4rem; }
   .done-sub { font-size: .9rem; color: var(--muted); }
+  .done-gif {
+    margin: .8rem auto 0;
+    max-height: 13rem;
+  }
   @keyframes stamp {
     from { transform: scale(1.5) rotate(-10deg); opacity: 0; }
     to   { transform: scale(1) rotate(0); opacity: 1; }
@@ -409,6 +413,7 @@
     </div>
     <p class="done-msg" id="done"></p>
     <p class="done-sub" id="done-sub"></p>
+    <img id="done-gif" class="done-gif meme" src="setup.gif" alt="" decoding="async" onerror="this.style.display='none'">
     <div class="divider" aria-hidden="true"></div>
     <button type="button" class="btn-quiet" id="again"></button>
   </section>
@@ -510,7 +515,7 @@
     device:      "device.gif",       // suspicious monkey: one phone, one name
     network:     "network.gif",      // skeleton: waiting for the internet
     emptyRoster: "emptyroster.gif",  // waiting for names that never came
-    noMatch:     "nomatch.gif",      // confused minions
+    noMatch:     "device.gif",
     tooMany:     "nomatch.gif",
     badName:     "locked.gif"
   };
@@ -720,6 +725,11 @@
       $("who").textContent  = name;
       $("when").textContent = now.toLocaleDateString(T.locale, { weekday: "short", month: "short", day: "numeric" })
         + "  ·  " + now.toLocaleTimeString(T.locale, { hour: "numeric", minute: "2-digit" });
+      const gif = $("done-gif");
+      if (gif) {
+        gif.style.display = "";
+        gif.src = "setup.gif";
+      }
       $("form-view").hidden = true;
       $("done-view").hidden = false;
     } catch {
