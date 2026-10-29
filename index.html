@@ -781,7 +781,7 @@
       .replace(/[\u06F0-\u06F9]/g, (d) => d.charCodeAt(0) - 0x6F0)
       .replace(/\D/g, "");
     $("code").value = scannedCode;
-    if (normalizedScannedCode.length === 6) $("code-field").hidden = true;
+    if (normalizedScannedCode.length === 6) $("code").type = "password";
 
 
     $("submit").textContent = T.submit;
