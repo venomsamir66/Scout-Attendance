@@ -167,17 +167,6 @@
       gap: .45rem;
     }
 
-    .subtitle::before {
-      content: "";
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 8px var(--accent-glow);
-      flex-shrink: 0;
-    }
-
     .field {
       margin-bottom: .25rem;
     }
@@ -572,6 +561,24 @@
       font-size: .78rem;
       color: hsl(var(--hue) 15% 38%);
     }
+
+    .copyright {
+      display: block;
+      margin-inline-start: .35rem;
+      font-size: .65em;
+      opacity: .55;
+    }
+
+    .support-link {
+      margin-inline-start: .4rem;
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .support-link:hover,
+    .support-link:focus-visible {
+      text-decoration: underline;
+    }
   </style>
 </head>
 
@@ -639,11 +646,17 @@
       <img id="done-gif" class="done-gif meme" src="setup.gif" alt="" decoding="async"
         onerror="this.style.display='none'">
       <div class="divider" aria-hidden="true"></div>
+      <button type="button" class="btn-quiet" id="finish"></button>
       <button type="button" class="btn-quiet" id="again"></button>
     </section>
   </main>
 
-  <footer id="footer-text" aria-label="معلومات النظام"></footer>
+  <footer aria-label="معلومات النظام">
+    <span id="footer-text"></span>
+    <span class="copyright" dir="ltr">© 2026 Youssef Samir. All rights reserved.
+      <a class="support-link" id="support-link" href="mailto:youssefsamir8989@gmail.com"></a>
+    </span>
+  </footer>
 
   <script>
     // ── Configuration ─────────────────────────────────────────────
@@ -665,8 +678,14 @@
         network: "تعذّر الاتصال. تحقق من الإنترنت وأعد المحاولة.",
         done: "تم تسجيل حضورك ✓",
         doneSub: "بالتوفيق في جلسة اليوم.",
+        already: "أنت سجلت حضورك بالفعل ✓",
+        alreadySub: "تم تسجيل حضورك من قبل.",
+        finish: "انتهيت",
+        finishSub: "تم تسجيل الحضور. يمكنك إغلاق هذه الصفحة الآن.",
+        alreadyFinishSub: "حضورك مسجّل بالفعل. يمكنك إغلاق هذه الصفحة الآن.",
         again: "تسجيل شخص آخر",
         footer: "نظام تسجيل الحضور الإلكتروني",
+        support: "Contact support",
         locale: "ar-SA",
         codeLabel: "رمز الاجتماع (٦ أرقام)",
         codeShort: "اكتب كود الاجتماع كامل  ٦ أرقام.",
@@ -700,8 +719,14 @@
         network: "Couldn't reach the server. Check your connection and try again.",
         done: "You're checked in ✓",
         doneSub: "Enjoy today's session!",
+        already: "You've already checked in ✓",
+        alreadySub: "Your attendance was already recorded.",
+        finish: "Done",
+        finishSub: "Attendance recorded. You can close this page now.",
+        alreadyFinishSub: "Your attendance is already recorded. You can close this page now.",
         again: "Check in someone else",
         footer: "Electronic Attendance System",
+        support: "Contact support",
         locale: "en-US",
         codeLabel: "Meeting code (6 digits)",
         codeShort: "Enter the 6-digit meeting code.",
@@ -787,8 +812,10 @@
     $("submit").textContent = T.submit;
     $("done").textContent = T.done;
     $("done-sub").textContent = T.doneSub;
+    $("finish").textContent = T.finish;
     $("again").textContent = T.again;
     $("footer-text").textContent = T.footer;
+    $("support-link").textContent = T.support;
 
     // ── Roster dropdown ───────────────────────────────────────────
     // After a valid code is entered, the server sends the roster (if the leader made one).
@@ -808,6 +835,7 @@
 
     let deviceLimit = 0; // minutes, reported by the server; when on, "check in someone else" is hidden
     let rosterFor = "";
+    let alreadyCheckedIn = false;
 
     function cleanCode() {
       return $("code").value
@@ -941,7 +969,10 @@
           body: JSON.stringify({ name, token: code, device: deviceId() })
         });
         const out = await res.json();
-        if (!out.ok) {
+        const already = Boolean(out.duplicate || out.already)
+          || ["duplicate", "already", "alreadyattended", "already_attended", "already-checked-in", "alreadycheckedin"]
+            .includes(String(out.error || "").toLowerCase());
+        if (!out.ok && !already) {
           setError(out.error === "expired" ? "expired"
             : out.error === "locked" ? "locked"
               : out.error === "notinroster" ? "notInRoster"
@@ -950,6 +981,13 @@
           if (out.error === "notinroster") { rosterFor = ""; loadRoster(); }
           return;
         }
+        const pageUrl = new URL(location.href);
+        pageUrl.searchParams.delete("t");
+        history.replaceState(history.state, "", pageUrl);
+        alreadyCheckedIn = already;
+        $("done").textContent = already ? T.already : T.done;
+        $("done-sub").textContent = already ? T.alreadySub : T.doneSub;
+        $("finish").hidden = false;
         $("again").hidden = deviceLimit > 0;
         const now = new Date();
         $("who").textContent = name;
@@ -968,6 +1006,11 @@
         $("submit").disabled = false;
         $("submit").textContent = T.submit;
       }
+    });
+
+    $("finish").addEventListener("click", () => {
+      $("done-sub").textContent = alreadyCheckedIn ? T.alreadyFinishSub : T.finishSub;
+      $("finish").hidden = true;
     });
 
     $("again").addEventListener("click", () => {
