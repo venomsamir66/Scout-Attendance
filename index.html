@@ -6,6 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="نظام تسجيل الحضور الإلكتروني للكشافة">
   <title>تسجيل الحضور</title>
+  <link rel="preconnect" href="https://script.google.com">
+  <link rel="preconnect" href="https://script.googleusercontent.com">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap"
@@ -913,7 +915,7 @@
       if (code.length !== 6 || code === rosterFor || SCRIPT_URL.startsWith("PASTE_")) return;
       rosterFor = code;
       try {
-        const res = await fetch(SCRIPT_URL + "?action=roster&t=" + code);
+        const res = await fetch(SCRIPT_URL + "?action=roster&t=" + code, { priority: "high" });
         const out = await res.json();
         if (!out.ok) {
           rosterFor = "";
