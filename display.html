@@ -153,6 +153,7 @@
     <p class="asub" id="asub" hidden></p>
     <div id="aabsent"></div>
     <p class="error" id="aerr" role="alert"></p>
+    <p class="hint ok" id="aok" role="status" aria-live="polite"></p>
     <div class="aactions">
       <button type="button" class="secondary" id="aexport" disabled></button>
       <button type="button" class="secondary" id="arefresh"></button>
@@ -195,7 +196,8 @@
           summaryLoading: "جارٍ إعداد الملخص...", summaryMeetings: "اجتماعات", summaryRate: "نسبة الحضور",
           summaryAttended: "حضر", summaryOf: "من", summaryRecent: "آخر الغيابات",
           summaryNoAbsences: "لا توجد غيابات", summaryEmpty: "لا توجد اجتماعات مسجلة.",
-          mtoomany: "تمت إضافة أسماء كثيرة في وقت قصير.", mlocked: "محاولات كثيرة. انتظر قليلًا." },
+          mtoomany: "تمت إضافة أسماء كثيرة في وقت قصير.", mlocked: "محاولات كثيرة. انتظر قليلًا.",
+          excuseAdded: "✓ تم إضافة العذر" },
     en: { login: "Leader screen", pw: "Leader password", go: "Show QR code", support: "Contact support",
           remember: "Stay signed in (save password in this browser)", rememberError: "Could not access local storage on this device.",
           wrong: "Wrong password.", net: "Couldn’t connect. Try again.", attendanceLoading: "Loading attendance...",
@@ -212,7 +214,8 @@
           summaryLoading: "Building summary...", summaryMeetings: "meetings", summaryRate: "Attendance rate",
           summaryAttended: "Attended", summaryOf: "of", summaryRecent: "Recent absences",
           summaryNoAbsences: "No absences", summaryEmpty: "No meetings have been recorded.",
-          mtoomany: "Too many new names were added recently.", mlocked: "Too many attempts. Wait a little." }
+          mtoomany: "Too many new names were added recently.", mlocked: "Too many attempts. Wait a little.",
+          excuseAdded: "✓ Excuse saved" }
   }[LANG];
 
   const $ = (id) => document.getElementById(id);
@@ -354,32 +357,7 @@
         list.append(row);
       });
 
-      $("asub").hidden = !out.absent.length;
-      $("asub").textContent = T.aabsent + " (" + out.absent.length + ")";
-      const ab = $("aabsent");
-      ab.replaceChildren();
-      const excused = new Set((out.excused || []).map((name) => String(name).normalize("NFC").toLocaleLowerCase()));
-      out.absent.forEach((name) => {
-        const row = document.createElement("div");
-        row.className = "arow";
-        const label = document.createElement("span");
-        label.textContent = name;
-        row.append(label);
-        if (excused.has(String(name).normalize("NFC").toLocaleLowerCase())) {
-          const status = document.createElement("span");
-          status.className = "t";
-          status.textContent = T.excused;
-          row.append(status);
-        } else {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "aexcuse";
-          button.textContent = T.markExcused;
-          button.addEventListener("click", () => markExcused(name, button));
-          row.append(button);
-        }
-        ab.append(row);
-      });
+      renderAbsentSection(out);
       attendanceData = out;
       $("aexport").disabled = false;
       $("asummary-open").disabled = false;
@@ -535,9 +513,44 @@
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
+  // ── renderAbsentSection ──────────────────────────────────────────────────
+  // Shared renderer used by loadAttendance() (full reload) and markExcused()
+  // (optimistic update). Keeps the absent list and the excuse logic in one place.
+  function renderAbsentSection(data) {
+    const excusedSet = new Set(
+      (data.excused || []).map((n) => String(n).normalize("NFC").toLocaleLowerCase())
+    );
+    $("asub").hidden = !data.absent.length;
+    $("asub").textContent = T.aabsent + " (" + data.absent.length + ")";
+    const ab = $("aabsent");
+    ab.replaceChildren();
+    data.absent.forEach((name) => {
+      const row = document.createElement("div");
+      row.className = "arow";
+      const label = document.createElement("span");
+      label.textContent = name;
+      row.append(label);
+      if (excusedSet.has(String(name).normalize("NFC").toLocaleLowerCase())) {
+        const badge = document.createElement("span");
+        badge.className = "t";
+        badge.textContent = T.excused;
+        row.append(badge);
+      } else {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "aexcuse";
+        btn.textContent = T.markExcused;
+        btn.addEventListener("click", () => markExcused(name, btn));
+        row.append(btn);
+      }
+      ab.append(row);
+    });
+  }
+
   async function markExcused(name, button) {
     button.disabled = true;
     $("aerr").textContent = "";
+    $("aok").textContent  = "";
     try {
       const res = await fetch(SCRIPT_URL, {
         method: "POST",
@@ -546,14 +559,23 @@
       });
       const out = await res.json();
       if (!out.ok) {
-        if (out.error === "denied") { $("att").close(); showLogin(T.wrong, true); }
-        else $("aerr").textContent = out.error === "locked" ? T.mlocked : T.excuseError;
+        if (out.error === "denied") { $("att").close(); showLogin(T.wrong, true); return; }
+        $("aerr").textContent = out.error === "locked" ? T.mlocked : T.excuseError;
+        button.disabled = false;
         return;
       }
-      await loadAttendance($("adate").value);
+      // Optimistic update: add to local excused list and immediately re-render
+      // the absent section so the button turns into an "Excused" badge at once.
+      if (attendanceData) {
+        attendanceData.excused = [...(attendanceData.excused || []), name];
+        renderAbsentSection(attendanceData);
+      }
+      // Show a brief success confirmation (auto-clears after 3 s).
+      $("aok").textContent = T.excuseAdded;
+      setTimeout(() => { $("aok").textContent = ""; }, 3000);
+      // button is now gone from the DOM (replaced by badge) – no need to re-enable it.
     } catch (e) {
       $("aerr").textContent = T.excuseError;
-    } finally {
       button.disabled = false;
     }
   }
