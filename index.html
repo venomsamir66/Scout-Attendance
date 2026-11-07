@@ -707,7 +707,8 @@
         notHere: "➕ اسمي غير موجود",
         badName: "اكتب اسمك الثلاثي بالحروف فقط (من غير ارقام).",
         pickName: "اختر اسمك من القائمة.",
-        notInRoster: "اسمك مش موجود في القائمة. تواصل مع القائد."
+        notInRoster: "اسمك مش موجود في القائمة. تواصل مع القائد.",
+        audit: "تعذّر تسجيل التغيير في سجل التدقيق؛ قد يكون الحضور قد سُجّل. تحقق من لوحة الإدارة قبل إعادة المحاولة."
       },
       en: {
         title: "Meeting Check-in",
@@ -748,7 +749,8 @@
         notHere: "➕ My name isn't here",
         badName: "Enter your three-part name using letters only.",
         pickName: "Choose your name from the list.",
-        notInRoster: "Your name isn't on the list. Ask a leader."
+        notInRoster: "Your name isn't on the list. Ask a leader.",
+        audit: "The audit entry could not be saved; attendance may already be recorded. Check the admin dashboard before trying again."
       }
     }[LANG];
 
@@ -968,7 +970,10 @@
         const res = await fetch(SCRIPT_URL, {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ name, token: code, device: deviceId() })
+          body: JSON.stringify({
+            name, token: code, device: deviceId(),
+            browser: navigator.userAgent + " | " + navigator.platform
+          })
         });
         const out = await res.json();
         const already = Boolean(out.duplicate || out.already)
@@ -979,6 +984,7 @@
             : out.error === "locked" ? "locked"
               : out.error === "notinroster" ? "notInRoster"
                 : out.error === "device" ? "device"
+                  : out.error === "audit" ? "audit"
                   : "network");
           if (out.error === "notinroster") { rosterFor = ""; loadRoster(); }
           return;

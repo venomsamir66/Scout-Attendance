@@ -190,6 +190,7 @@
           abtn: "📋 عرض الحضور", atitle: "سجل الحضور", aclose: "إغلاق", arefresh: "تحديث",
           apresent: "الحاضرون", aof: "من", aabsent: "لم يحضروا", anone: "لا يوجد حضور مسجَّل بعد.", atoday: "اليوم",
           markExcused: "إضافة عذر", excused: "لديه عذر", excuseError: "تعذّر حفظ العذر. حدّث Apps Script وحاول مرة أخرى.",
+          auditError: "قد يكون التغيير قد تم، لكن تعذّر تسجيله في سجل التدقيق. تحقق من لوحة الإدارة.",
           exportCsv: "تنزيل CSV", csvDate: "التاريخ", csvName: "الاسم", csvStatus: "الحالة", csvTime: "وقت التسجيل",
           csvPresent: "حاضر", csvAbsent: "غائب", csvExcused: "بعذر",
           summaryOpen: "عرض ملخص الحضور", summaryTitle: "ملخص الحضور", summaryBack: "العودة للحضور اليومي",
@@ -214,6 +215,7 @@
           summaryLoading: "Building summary...", summaryMeetings: "meetings", summaryRate: "Attendance rate",
           summaryAttended: "Attended", summaryOf: "of", summaryRecent: "Recent absences",
           summaryNoAbsences: "No absences", summaryEmpty: "No meetings have been recorded.",
+          auditError: "The change may have saved, but its audit entry could not be recorded. Check the admin dashboard.",
           mtoomany: "Too many new names were added recently.", mlocked: "Too many attempts. Wait a little.",
           excuseAdded: "✓ Excuse saved" }
   }[LANG];
@@ -555,12 +557,16 @@
       const res = await fetch(SCRIPT_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "excuse", key: password, name, date: $("adate").value })
+        body: JSON.stringify({
+          action: "excuse", key: password, name, date: $("adate").value,
+          browser: navigator.userAgent + " | " + navigator.platform
+        })
       });
       const out = await res.json();
       if (!out.ok) {
         if (out.error === "denied") { $("att").close(); showLogin(T.wrong, true); return; }
-        $("aerr").textContent = out.error === "locked" ? T.mlocked : T.excuseError;
+        $("aerr").textContent = out.error === "locked" ? T.mlocked
+          : out.error === "audit" ? T.auditError : T.excuseError;
         button.disabled = false;
         return;
       }
@@ -630,7 +636,10 @@
       const res = await fetch(SCRIPT_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "leader", key: password, name, isNew })
+        body: JSON.stringify({
+          action: "leader", key: password, name, isNew,
+          browser: navigator.userAgent + " | " + navigator.platform
+        })
       });
       const out = await res.json();
       if (out.ok) {
@@ -643,7 +652,8 @@
       } else if (out.error === "denied") {
         showLogin(T.wrong, true);
       } else {
-        msg.textContent = out.error === "badname" ? T.mbad
+        msg.textContent = out.error === "audit" ? T.auditError
+                        : out.error === "badname" ? T.mbad
                         : out.error === "toomany" ? T.mtoomany
                         : out.error === "locked"  ? T.mlocked
                         : T.net;
