@@ -9,244 +9,713 @@
     :root {
       color-scheme: light dark;
       --bg: #e6ede1; --surface: #f7faf4; --ink: #14231a; --muted: #4c6054;
-      --forest: #1f4d2e; --line: #b9c7b3; --error: #a82e24;
+      --forest: #1f4d2e; --line: #b9c7b3; --error: #a82e24; --gold: #e0a526;
     }
     @media (prefers-color-scheme: dark) {
-      :root { --bg: #0f1d14; --surface: #172a1e; --ink: #e6efe2; --muted: #9db2a3; --forest: #3e8b58; --line: #2e4636; --error: #ff8f82; }
+      :root { --bg: #0f1d14; --surface: #172a1e; --ink: #e6efe2; --muted: #9db2a3; --forest: #3e8b58; --line: #2e4636; --error: #ff8f82; --gold: #e8b445; }
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; }
     main { width: min(100% - 2rem, 70rem); margin: 2rem auto; }
-    h1 { margin: 0 0 1rem; }
+    h1 { margin: 0 0 .4rem; }
     h2 { font-size: 1.2rem; margin: 0 0 .75rem; }
-    section, form { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 1rem; margin: 1rem 0; }
-    input, button { font: inherit; border-radius: 8px; padding: .7rem .8rem; }
-    input { max-width: 100%; color: var(--ink); background: var(--bg); border: 1px solid var(--line); }
+    section, form.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 1rem; margin: 1rem 0; }
+    input, select, button { font: inherit; border-radius: 8px; padding: .65rem .8rem; }
+    input, select { max-width: 100%; color: var(--ink); background: var(--bg); border: 1px solid var(--line); }
     button { border: 0; background: var(--forest); color: white; font-weight: 700; cursor: pointer; }
+    button.secondary { background: transparent; color: var(--forest); border: 1px solid var(--forest); }
     button:disabled { opacity: .6; cursor: wait; }
     .login { display: flex; flex-wrap: wrap; gap: .6rem; }
     .login input { flex: 1 1 14rem; }
     .toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .75rem; }
     .toolbar h2 { margin: 0; }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
+    .row > input, .row > select { flex: 1 1 12rem; }
     .muted, #status { color: var(--muted); }
-    #status.error { color: var(--error); }
+    #status.error, .error { color: var(--error); }
     .notice { font-size: .9rem; }
     .scroll { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; text-align: start; }
     th, td { padding: .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
     th { white-space: nowrap; }
     td.device { min-width: 14rem; overflow-wrap: anywhere; font-size: .85rem; }
+    .code { font: 700 clamp(2rem, 12vw, 3.4rem)/1 ui-monospace, monospace; letter-spacing: .12em; direction: ltr; margin: 1rem 0; }
+    #qrbox { background: white; padding: 14px; display: inline-block; border: 3px solid var(--forest); border-radius: 12px; }
+    #qr img, #qr canvas { display: block; }
+    .qr-area { text-align: center; }
+    .bar { height: 8px; max-width: 24rem; margin: 1rem auto 0; background: var(--line); border-radius: 5px; overflow: hidden; }
+    .bar > div { height: 100%; width: 100%; background: var(--gold); }
+    .arow { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .75rem; padding: .45rem 0; border-bottom: 1px solid var(--line); }
+    .arow .time, .arow .attendance-status { color: var(--muted); }
+    .arow .time { white-space: nowrap; }
+    .arow button { padding: .25rem .6rem; font-size: .9rem; }
+    .arow-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .summary-row { padding: .7rem 0; border-bottom: 1px solid var(--line); }
+    .summary-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; }
     [hidden] { display: none !important; }
+    @media print {
+      #login, #status, #manual-section, #audit-section, #password-section, #attendance-actions { display: none !important; }
+      body { background: white; color: black; }
+    }
   </style>
 </head>
 <body>
 <main>
-  <h1 id="title">Private attendance dashboard</h1>
-  <p class="notice muted" id="notice">Sign in.</p>
+  <h1>Private attendance dashboard</h1>
+  <p class="notice muted">Successful check-ins, roster additions, excuses, attendance edits/deletions, display-password changes, and automatic time-format repairs are recorded below. Direct spreadsheet edits and rejected requests are not included. The dashboard shows the latest 500 changes.</p>
   <form id="login" class="login">
-    <input id="password" type="password" autocomplete="current-password" placeholder="Leader password" required>
+    <input id="password" type="password" autocomplete="current-password" placeholder="Private admin password" required>
     <button id="sign-in" type="submit">Sign in</button>
   </form>
   <p id="status" role="status" aria-live="polite"></p>
+
   <div id="dashboard" hidden>
-    <section>
+    <section class="qr-area">
       <div class="toolbar">
-        <h2 id="attendance-title">Attendance</h2>
-        <label><span id="date-label">Meeting date</span> <input id="date" type="date"></label>
-      </div>
-      <p id="attendance-count" class="muted"></p>
-      <div class="scroll"><table>
-        <thead><tr><th id="scout-heading">Scout</th><th id="attendance-heading">Attendance</th><th id="time-heading">Check-in time</th></tr></thead>
-        <tbody id="attendance-rows"></tbody>
-      </table></div>
-    </section>
-    <section>
-      <div class="toolbar">
-        <h2 id="audit-title">Change history (latest 500)</h2>
-        <div>
-          <button id="reload" type="button">Refresh</button>
-          <button id="logout" type="button">Sign out</button>
+        <h2>Meeting QR code</h2>
+        <div class="row">
+          <button id="refresh" class="secondary" type="button">Refresh</button>
+          <button id="logout" class="secondary" type="button">Sign out</button>
         </div>
       </div>
+      <div class="code" id="code"></div>
+      <div id="qrbox"><div id="qr"></div></div>
+      <div class="bar"><div id="fill"></div></div>
+      <p class="muted" id="qr-hint">Scan the QR code to check in. The meeting code changes automatically.</p>
+    </section>
+
+    <section id="manual-section">
+      <h2>Manual check-in (and add a scout)</h2>
+      <div class="row">
+        <select id="roster" aria-label="Scout"></select>
+        <input id="new-name" type="text" maxlength="60" placeholder="New scout's full name" hidden>
+        <button id="check-in" type="button">Check in</button>
+      </div>
+      <p id="manual-status" class="muted" role="status"></p>
+      <h2>Add a name to the roster</h2>
+      <div class="row">
+        <input id="add-scout-name" type="text" maxlength="60" placeholder="Scout's full name (no check-in)">
+        <button id="add-scout" type="button">Add name</button>
+      </div>
+      <p id="add-scout-status" class="muted" role="status"></p>
+    </section>
+
+    <section>
+      <div id="daily-attendance">
+        <div class="toolbar">
+          <h2>Attendance</h2>
+          <label>Meeting date <select id="date"></select></label>
+        </div>
+        <p id="attendance-count" class="muted"></p>
+        <div id="attendance-list"></div>
+        <p id="attendance-error" class="error" role="alert"></p>
+        <div class="row" id="attendance-actions">
+          <button id="export" class="secondary" type="button" disabled>Export CSV</button>
+          <button id="summary-open" class="secondary" type="button" disabled>Attendance summary</button>
+        </div>
+      </div>
+      <div id="summary" hidden>
+        <div class="toolbar">
+          <h2>Attendance summary</h2>
+          <button id="summary-back" class="secondary" type="button">Back to daily attendance</button>
+        </div>
+        <p id="summary-status" class="muted" role="status"></p>
+        <div id="summary-list"></div>
+      </div>
+    </section>
+
+    <section id="audit-section">
+      <div class="toolbar">
+        <h2>Change history (latest 500)</h2>
+        <button id="audit-refresh" class="secondary" type="button">Refresh history</button>
+      </div>
       <div class="scroll"><table>
-        <thead><tr><th id="when-heading">Changed at</th><th id="change-heading">Change</th><th id="actor-heading">Recorded as</th><th id="date-heading">Meeting date</th><th id="name-heading">Name</th><th id="device-heading">Device / browser</th></tr></thead>
+        <thead><tr><th>Changed at</th><th>Change</th><th>Recorded as</th><th>Meeting date</th><th>Name / detail</th><th>Device / browser</th></tr></thead>
         <tbody id="audit-rows"></tbody>
       </table></div>
     </section>
+
+    <section id="password-section">
+      <h2>Change leader/display password</h2>
+      <p class="muted">This changes the password used to open the existing leader display. The admin password stays separate.</p>
+      <form id="password-form">
+        <div class="row">
+          <input id="new-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" placeholder="New display password (12+ characters)" required>
+          <input id="confirm-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" placeholder="Confirm new password" required>
+          <button id="change-password" type="submit">Change display password</button>
+        </div>
+        <p id="password-status" class="muted" role="status"></p>
+      </form>
+    </section>
   </div>
 </main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzHuT96lN2SpUvKUu_ibgIgMxehFNJ79FFlpnvn-XNh_jW1E8pmZJzZZzlDHRVe90MqZA/exec";
-  const LANG = "en";
-  const TEXT = {
-    en: {
-      title: "Private attendance dashboard",
-      notice: "Sign in with your private admin password. This page shows app-recorded attendance and changes. Browser details may not identify an exact phone model, and changes made directly in the spreadsheet are not included.",
-      password: "Private admin password", signIn: "Sign in", attendance: "Attendance",
-      meetingDate: "Meeting date", scout: "Scout", status: "Attendance",
-      time: "Check-in time", present: "Present", absent: "Absent",
-      excused: "Excused", count: "Present: {present} / {total}",
-      history: "Change history (latest 500)", refresh: "Refresh", signOut: "Sign out",
-      when: "Changed at", change: "Change", actor: "Recorded as",
-      date: "Meeting date", name: "Name", device: "Device / browser",
-      checkin: "Check-in", excuse: "Excuse added", roster_add: "Scout added to roster",
-      leader: "Leader account", scoutActor: "Scout check-in",
-      noAttendance: "No attendance records for this date.",
-      noEvents: "No changes have been recorded yet.",
-      denied: "Incorrect leader password.", locked: "Too many attempts. Try again later.",
-      admin_unconfigured: "Set ADMIN_PASSWORD in Apps Script project settings first.",
-      failed: "Could not load the dashboard. Check the connection and try again."
-    },
-    ar: {
-      title: "لوحة الحضور الخاصة",
-      notice: "سجّل الدخول بكلمة مرور الإدارة الخاصة بك. تعرض هذه الصفحة الحضور والتغييرات المسجلة عبر التطبيق. قد لا تكشف بيانات المتصفح طراز الهاتف بدقة، ولا تشمل التغييرات المباشرة في جدول البيانات.",
-      password: "كلمة مرور الإدارة", signIn: "دخول", attendance: "الحضور",
-      meetingDate: "تاريخ الاجتماع", scout: "الكشاف", status: "الحالة",
-      time: "وقت التسجيل", present: "حاضر", absent: "غائب",
-      excused: "بعذر", count: "الحاضرون: {present} / {total}",
-      history: "سجل التغييرات (آخر 500)", refresh: "تحديث", signOut: "خروج",
-      when: "وقت التغيير", change: "التغيير", actor: "المنفّذ",
-      date: "تاريخ الاجتماع", name: "الاسم", device: "الجهاز / المتصفح",
-      checkin: "تسجيل حضور", excuse: "إضافة عذر", roster_add: "إضافة كشاف للقائمة",
-      leader: "حساب القائد", scoutActor: "تسجيل الكشاف",
-      noAttendance: "لا توجد سجلات حضور لهذا التاريخ.",
-      noEvents: "لم يتم تسجيل تغييرات بعد.",
-      denied: "كلمة مرور القائد غير صحيحة.", locked: "محاولات كثيرة. حاول لاحقًا.",
-      admin_unconfigured: "يجب إعداد ADMIN_PASSWORD في إعدادات مشروع Apps Script أولًا.",
-      failed: "تعذّر تحميل اللوحة. تحقق من الاتصال وحاول مرة أخرى."
-    }
-  }[LANG];
+  const CHECKIN_URL = "https://venomsamir66.github.io/Scout-Attendance/";
   const $ = id => document.getElementById(id);
-  let leaderPassword = "";
+  const NEW = "__new__";
+  function displayAttendanceTime(value) {
+    const text = String(value ?? "").trim();
+    const match = text.match(/(\d{1,2}):([0-5]\d)(?::[0-5]\d)?\s*(AM|PM|ص|م)?/i);
+    if (!match) return text;
 
-  document.documentElement.lang = LANG;
-  document.documentElement.dir = LANG === "ar" ? "rtl" : "ltr";
-  $("title").textContent = TEXT.title;
-  $("notice").textContent = TEXT.notice;
-  $("password").placeholder = TEXT.password;
-  $("sign-in").textContent = TEXT.signIn;
-  $("attendance-title").textContent = TEXT.attendance;
-  $("date-label").textContent = TEXT.meetingDate;
-  $("scout-heading").textContent = TEXT.scout;
-  $("attendance-heading").textContent = TEXT.status;
-  $("time-heading").textContent = TEXT.time;
-  $("audit-title").textContent = TEXT.history;
-  $("reload").textContent = TEXT.refresh;
-  $("logout").textContent = TEXT.signOut;
-  $("when-heading").textContent = TEXT.when;
-  $("change-heading").textContent = TEXT.change;
-  $("actor-heading").textContent = TEXT.actor;
-  $("date-heading").textContent = TEXT.date;
-  $("name-heading").textContent = TEXT.name;
-  $("device-heading").textContent = TEXT.device;
+    let hour = Number(match[1]);
+    const marker = String(match[3] || "").toUpperCase();
+    if (marker === "AM" || marker === "PM") {
+      if (marker === "AM" && hour === 12) hour = 0;
+      if (marker === "PM" && hour < 12) hour += 12;
+    } else if (!marker && hour > 23) {
+      return text;
+    }
 
-  function cell(row, value, className) {
+    const arabicMarker = marker === "ص" || marker === "م"
+      ? match[3] : hour < 12 ? "ص" : "م";
+    return (hour % 12 || 12) + ":" + match[2] + " " + arabicMarker;
+  }
+  let adminPassword = "";
+  let attendanceData = null;
+  let qr = null;
+  let token = "";
+  let secondsLeft = 0;
+  let tickTimer = null;
+
+  function status(message, error = false) {
+    $("status").textContent = message;
+    $("status").className = error ? "error" : "";
+  }
+
+  function escapeCsv(value) {
+    const text = String(value ?? "");
+    const safe = /^[\t\r\n ]*[=+\-@]/.test(text) ? "'" + text : text;
+    return '"' + safe.replace(/"/g, '""') + '"';
+  }
+
+  async function adminRequest(command, fields = {}) {
+    const response = await fetch(SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "admin", command, key: adminPassword,
+        browser: navigator.userAgent + " | " + navigator.platform,
+        ...fields
+      })
+    });
+    return response.json();
+  }
+
+  function drawToken(value) {
+    token = value;
+    $("code").textContent = value.slice(0, 3) + " " + value.slice(3);
+    const url = CHECKIN_URL + (CHECKIN_URL.includes("?") ? "&" : "?") + "t=" + value;
+    const size = Math.min(360, Math.floor(Math.min(innerWidth, innerHeight) * .65));
+    if (!qr) qr = new QRCode($("qr"), { text: url, width: size, height: size, correctLevel: QRCode.CorrectLevel.M });
+    else qr.makeCode(url);
+  }
+
+  function startCountdown(seconds, windowSeconds) {
+    clearInterval(tickTimer);
+    secondsLeft = seconds;
+    const total = windowSeconds || 600;
+    const paint = () => {
+      $("fill").style.width = Math.max(0, Math.min(100, secondsLeft / total * 100)) + "%";
+    };
+    paint();
+    tickTimer = setInterval(() => {
+      secondsLeft = Math.max(0, secondsLeft - 1);
+      paint();
+      if (!secondsLeft) {
+        clearInterval(tickTimer);
+        loadState();
+      }
+    }, 1000);
+  }
+
+  function fillRoster(names) {
+    const select = $("roster");
+    const keep = select.value;
+    select.replaceChildren(new Option("— Choose scout —", ""));
+    names.forEach(name => select.add(new Option(name, name)));
+    select.add(new Option("➕ Add a new scout", NEW));
+    select.value = names.includes(keep) || keep === NEW ? keep : "";
+    $("new-name").hidden = select.value !== NEW;
+  }
+
+  function addCell(row, value, className) {
     const td = document.createElement("td");
     td.textContent = value;
     if (className) td.className = className;
     row.append(td);
   }
 
-  function showStatus(message, isError = false) {
-    $("status").textContent = message;
-    $("status").className = isError ? "error" : "";
+  function renderAttendance(data) {
+    attendanceData = data;
+    const dateSelect = $("date");
+    const selected = data.date;
+    dateSelect.replaceChildren();
+    data.dates.forEach(date => dateSelect.add(new Option(date === data.today ? date + " (today)" : date, date)));
+    dateSelect.value = selected;
+    $("attendance-count").textContent = "Present: " + data.present.length + (data.total ? " / " + data.total : "");
+    $("attendance-list").replaceChildren();
+    $("attendance-error").textContent = "";
+    const excused = new Set((data.excused || []).map(name => String(name).normalize("NFC").toLocaleLowerCase()));
+    const present = data.present || [];
+    const excuses = new Map((data.excuses || []).map(item => [
+      String(item.name).normalize("NFC").toLocaleLowerCase(), String(item.reason || "")
+    ]));
+    if (!present.length && !data.absent.length) {
+      $("attendance-list").textContent = "No attendance recorded for this date.";
+    }
+    present.forEach((entry, index) => {
+      entry.time = displayAttendanceTime(entry.time);
+      const row = document.createElement("div");
+      row.className = "arow";
+      const name = document.createElement("span");
+      name.textContent = (index + 1) + ". " + entry.name;
+      const time = document.createElement("span");
+      time.className = "time";
+      time.textContent = entry.time;
+      const actions = document.createElement("div");
+      actions.className = "arow-actions";
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "secondary";
+      edit.textContent = "Edit time";
+      edit.addEventListener("click", () => editAttendanceTime(entry, edit));
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "secondary";
+      remove.textContent = "Delete";
+      remove.addEventListener("click", () => deleteAttendance(entry, remove));
+      actions.append(edit, remove);
+      row.append(name, time, actions);
+      $("attendance-list").append(row);
+    });
+    data.absent.forEach(name => {
+      const row = document.createElement("div");
+      row.className = "arow";
+      const label = document.createElement("span");
+      const key = String(name).normalize("NFC").toLocaleLowerCase();
+      const isExcused = excused.has(key);
+      const reason = excuses.get(key) || "";
+      label.textContent = name + (isExcused
+        ? reason ? " — Excused: " + reason : " — Excused without reason"
+        : " — Absent");
+      row.append(label);
+      if (isExcused && !reason) {
+        const addReason = document.createElement("button");
+        addReason.type = "button";
+        addReason.className = "secondary";
+        addReason.textContent = "Add reason";
+        addReason.addEventListener("click", () => addExcuseReason(name, addReason));
+        row.append(addReason);
+      } else if (!isExcused) {
+        const actions = document.createElement("div");
+        actions.className = "arow-actions";
+        const withoutReason = document.createElement("button");
+        withoutReason.type = "button";
+        withoutReason.className = "secondary";
+        withoutReason.textContent = "Excuse without reason";
+        withoutReason.addEventListener("click", () => markExcused(name, false, withoutReason));
+        const withReason = document.createElement("button");
+        withReason.type = "button";
+        withReason.className = "secondary";
+        withReason.textContent = "Excuse with reason";
+        withReason.addEventListener("click", () => markExcused(name, true, withReason));
+        actions.append(withoutReason, withReason);
+        row.append(actions);
+      }
+      $("attendance-list").append(row);
+    });
+    $("export").disabled = false;
+    $("summary-open").disabled = false;
   }
 
-  async function loadDashboard() {
-    $("reload").disabled = true;
-    showStatus("");
+  function renderAudit(events) {
+    const tbody = $("audit-rows");
+    tbody.replaceChildren();
+    if (!events.length) {
+      const row = tbody.insertRow();
+      const cell = row.insertCell();
+      cell.colSpan = 6;
+      cell.textContent = "No changes have been recorded yet.";
+      return;
+    }
+    const labels = {
+      checkin: "Check-in", excuse: "Excuse without reason", excuse_reason: "Excuse with reason",
+      excuse_reason_added: "Reason added to excuse",
+      attendance_edit: "Attendance time edited", attendance_delete: "Attendance deleted",
+      attendance_time_normalized: "Attendance times converted to Arabic",
+      roster_add: "Scout added to roster",
+      password_change: "Display password changed"
+    };
+    events.forEach(event => {
+      const row = tbody.insertRow();
+      addCell(row, event.changedAt);
+      addCell(row, labels[event.action] || event.action);
+      addCell(row, event.actor === "admin" ? "Admin"
+        : event.actor === "leader" ? "Leader"
+        : event.actor === "system" ? "System" : "Scout");
+      addCell(row, event.date);
+      addCell(row, event.name);
+      addCell(row, event.browser || "—", "device");
+    });
+  }
+
+  async function loadState(date) {
+    if (!adminPassword) return;
+    $("refresh").disabled = true;
+    status("");
     try {
-      const response = await fetch(SCRIPT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          action: "admin", key: leaderPassword, date: $("date").value
-        })
-      });
-      const result = await response.json();
+      const result = await adminRequest("state", { date: date || $("date").value });
       if (!result.ok) {
         if (result.error === "denied" || result.error === "locked" || result.error === "admin_unconfigured") {
-          showStatus(TEXT[result.error], true);
-          if (result.error === "denied") {
-            leaderPassword = "";
-            $("dashboard").hidden = true;
-            $("login").hidden = false;
-          }
-        } else showStatus(TEXT.failed, true);
+          const messages = {
+            denied: "Incorrect admin password.",
+            locked: "Too many attempts. Try again later.",
+            admin_unconfigured: "Set ADMIN_PASSWORD in Apps Script Script properties first."
+          };
+          if (result.error === "denied") signOut();
+          status(messages[result.error], true);
+        } else status("Could not load the dashboard.", true);
         return;
-      }
-
-      const attendance = result.attendance;
-      $("date").value = attendance.date;
-      $("attendance-count").textContent = TEXT.count
-        .replace("{present}", attendance.present.length)
-        .replace("{total}", attendance.total);
-      const attendees = new Map(attendance.present.map(item => [item.name, item.time]));
-      const excused = new Set((attendance.excused || []).map(name => name.normalize("NFC").toLocaleLowerCase()));
-      const attendanceRows = $("attendance-rows");
-      attendanceRows.replaceChildren();
-      if (!attendance.absent.length && !attendance.present.length) {
-        const row = attendanceRows.insertRow();
-        const td = row.insertCell();
-        td.colSpan = 3;
-        td.textContent = TEXT.noAttendance;
-      } else {
-        attendance.present.forEach(item => {
-          const row = attendanceRows.insertRow();
-          cell(row, item.name);
-          cell(row, TEXT.present);
-          cell(row, item.time);
-        });
-        attendance.absent.forEach(name => {
-          const row = attendanceRows.insertRow();
-          cell(row, name);
-          const key = name.normalize("NFC").toLocaleLowerCase();
-          cell(row, excused.has(key) ? TEXT.excused : TEXT.absent);
-          cell(row, attendees.get(name) || "—");
-        });
-      }
-
-      const auditRows = $("audit-rows");
-      auditRows.replaceChildren();
-      if (!result.events.length) {
-        const row = auditRows.insertRow();
-        const td = row.insertCell();
-        td.colSpan = 6;
-        td.textContent = TEXT.noEvents;
-      } else {
-        result.events.forEach(event => {
-          const row = auditRows.insertRow();
-          cell(row, event.changedAt);
-          cell(row, TEXT[event.action] || event.action);
-          cell(row, event.actor === "leader" ? TEXT.leader : TEXT.scoutActor);
-          cell(row, event.date);
-          cell(row, event.name);
-          cell(row, event.browser || "—", "device");
-        });
       }
       $("login").hidden = true;
       $("dashboard").hidden = false;
+      drawToken(result.token);
+      startCountdown(result.secondsLeft, result.windowSeconds);
+      fillRoster(result.names || []);
+      renderAttendance(result.attendance);
+      renderAudit(result.events || []);
     } catch (error) {
-      showStatus(TEXT.failed, true);
+      status("Could not connect to the attendance service. Try again.", true);
     } finally {
-      $("reload").disabled = false;
+      $("refresh").disabled = false;
     }
   }
 
-  $("login").addEventListener("submit", async event => {
+  async function markExcused(name, hasReason, button) {
+    const reason = hasReason ? prompt("Enter the excuse reason (up to 300 characters):") : "";
+    if (hasReason && (reason === null || !reason.trim())) return;
+    if (hasReason && reason.trim().length > 300) {
+      $("attendance-error").textContent = "Enter a reason of 1–300 characters.";
+      return;
+    }
+    button.disabled = true;
+    $("attendance-error").textContent = "";
+    try {
+      const result = await adminRequest(hasReason ? "excuse_reason" : "excuse", {
+        name, date: $("date").value, reason: hasReason ? reason.trim() : ""
+      });
+      if (!result.ok) throw new Error(result.error || "request");
+      await loadState($("date").value);
+    } catch (error) {
+      $("attendance-error").textContent = error.message === "audit"
+        ? "The excuse may have been saved but its audit record failed. Refresh to check."
+        : error.message === "badreason" ? "Enter a reason of 1–300 characters."
+        : "Could not save the excuse.";
+      button.disabled = false;
+    }
+  }
+
+  async function addExcuseReason(name, button) {
+    const reason = prompt("Enter the excuse reason (up to 300 characters):");
+    if (reason === null) return;
+    if (!reason.trim() || reason.trim().length > 300) {
+      $("attendance-error").textContent = "Enter a reason of 1–300 characters.";
+      return;
+    }
+    button.disabled = true;
+    $("attendance-error").textContent = "";
+    try {
+      const result = await adminRequest("add_excuse_reason", {
+        name, date: $("date").value, reason: reason.trim()
+      });
+      if (!result.ok) throw new Error(result.error || "request");
+      await loadState($("date").value);
+    } catch (error) {
+      $("attendance-error").textContent = error.message === "audit"
+        ? "The reason may have been saved but its audit record failed. Refresh to check."
+        : error.message === "reason_exists" ? "A reason has already been saved for this excuse."
+        : error.message === "no_excuse" ? "This excuse was not found. Refresh and try again."
+        : error.message === "badreason" ? "Enter a reason of 1–300 characters."
+        : "Could not add the excuse reason.";
+      button.disabled = false;
+    }
+  }
+
+  async function editAttendanceTime(entry, button) {
+    const time = prompt("Enter the new time (for example, 7:30 م or 7:30 PM):", entry.time);
+    if (time === null) return;
+    if (!/^(0?[1-9]|1[0-2]):[0-5]\d\s*(AM|PM|ص|م)$/i.test(time.trim())) {
+      $("attendance-error").textContent = "Use a time such as 7:30 م or 7:30 PM.";
+      return;
+    }
+    await changeAttendance("edit_attendance", entry, button, { time: time.trim() });
+  }
+
+  async function deleteAttendance(entry, button) {
+    if (!confirm("Delete " + entry.name + "'s attendance at " + entry.time + "?")) return;
+    await changeAttendance("delete_attendance", entry, button);
+  }
+
+  async function changeAttendance(command, entry, button, fields = {}) {
+    button.disabled = true;
+    $("attendance-error").textContent = "";
+    try {
+      const result = await adminRequest(command, {
+        date: $("date").value, name: entry.name, row: entry.row, expectedTime: entry.time, ...fields
+      });
+      if (!result.ok) throw new Error(result.error || "request");
+      await loadState($("date").value);
+    } catch (error) {
+      $("attendance-error").textContent = error.message === "audit"
+        ? "The attendance change may have saved but its audit record failed. Refresh to check."
+        : error.message === "stale" ? "This attendance changed elsewhere. Refresh and try again."
+        : error.message === "badtime" ? "Use a time such as 7:30 م or 7:30 PM."
+        : "Could not update attendance.";
+      button.disabled = false;
+    }
+  }
+
+  async function manualCheckin() {
+    const isNew = $("roster").value === NEW;
+    const name = (isNew ? $("new-name").value : $("roster").value).trim().replace(/\s+/g, " ");
+    const message = $("manual-status");
+    message.textContent = "";
+    if (!name) { message.textContent = "Choose a scout or enter a name."; return; }
+    if (isNew && (name.split(" ").length < 3 || !/^[\p{L}\p{M}\s'’.\-]+$/u.test(name))) {
+      message.textContent = "Enter the scout's full name using letters only.";
+      return;
+    }
+    $("check-in").disabled = true;
+    try {
+      const result = await adminRequest("checkin", { name, isNew });
+      if (!result.ok) {
+        const errors = {
+          badname: "Enter the scout's full name using letters only.",
+          toomany: "Too many new names were added recently.",
+          audit: "The check-in may have saved but its audit record failed. Refresh to check."
+        };
+        message.textContent = errors[result.error] || "Could not check in this scout.";
+        return;
+      }
+      message.textContent = result.duplicate ? name + " is already checked in today." : "Checked in: " + name;
+      $("roster").value = "";
+      $("new-name").value = "";
+      $("new-name").hidden = true;
+      await loadState($("date").value);
+    } catch (error) {
+      message.textContent = "Could not connect. Refresh and check attendance before retrying.";
+    } finally {
+      $("check-in").disabled = false;
+    }
+  }
+
+  async function addScout() {
+    const name = $("add-scout-name").value.trim().replace(/\s+/g, " ");
+    const message = $("add-scout-status");
+    message.textContent = "";
+    if (name.length > 60 || name.split(" ").length < 3 || !/^[\p{L}\p{M}\s'’.\-]+$/u.test(name)) {
+      message.textContent = "Enter the scout's full name using letters only.";
+      return;
+    }
+    $("add-scout").disabled = true;
+    try {
+      const result = await adminRequest("add_scout", { name });
+      if (!result.ok) {
+        const errors = {
+          badname: "Enter the scout's full name using letters only.",
+          toomany: "Too many new names were added recently.",
+          audit: "The name may have been added but its audit record failed. Refresh to check."
+        };
+        message.textContent = errors[result.error] || "Could not add this name.";
+        return;
+      }
+      $("add-scout-name").value = "";
+      fillRoster(result.names || []);
+      message.textContent = result.duplicate ? name + " is already in the roster." : "Added to roster: " + name;
+      await loadState($("date").value);
+    } catch (error) {
+      message.textContent = "Could not connect. Refresh and check the roster before retrying.";
+    } finally {
+      $("add-scout").disabled = false;
+    }
+  }
+
+  function downloadCsv() {
+    if (!attendanceData) return;
+    const excused = new Set((attendanceData.excused || []).map(name => String(name).normalize("NFC").toLocaleLowerCase()));
+    const excuses = new Map((attendanceData.excuses || []).map(item => [
+      String(item.name).normalize("NFC").toLocaleLowerCase(), String(item.reason || "")
+    ]));
+    const rows = [
+      ["Date", "Name", "Status", "Check-in time"],
+      ...attendanceData.present.map(entry => [attendanceData.date, entry.name, "Present", entry.time]),
+      ...attendanceData.absent.map(name => {
+        const key = String(name).normalize("NFC").toLocaleLowerCase();
+        const reason = excuses.get(key);
+        const label = !excused.has(key) ? "Absent"
+          : reason ? "Excused: " + reason : "Excused without reason";
+        return [attendanceData.date, name, label, ""];
+      })
+    ];
+    const csv = "\uFEFF" + rows.map(row => row.map(escapeCsv).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "attendance-" + attendanceData.date + ".csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function loadSummary() {
+    $("daily-attendance").hidden = true;
+    $("summary").hidden = false;
+    $("summary-status").textContent = "Building attendance summary…";
+    $("summary-list").replaceChildren();
+    $("summary-open").disabled = true;
+    try {
+      const dates = [...new Set(attendanceData?.dates || [])].sort((a, b) => b.localeCompare(a));
+      const records = new Map();
+      if (attendanceData) records.set(attendanceData.date, attendanceData);
+      const missing = dates.filter(date => !records.has(date));
+      for (let i = 0; i < missing.length; i += 4) {
+        const batch = await Promise.all(missing.slice(i, i + 4).map(async date => ({
+          date, result: await adminRequest("attendance", { date })
+        })));
+        batch.forEach(item => {
+          if (!item.result.ok) throw new Error(item.result.error || "request");
+          records.set(item.date, item.result.attendance);
+        });
+      }
+      const scouts = new Map();
+      const getScout = name => {
+        const key = String(name).normalize("NFC").toLocaleLowerCase();
+        if (!scouts.has(key)) scouts.set(key, { name, attended: 0, eligible: 0, absences: [] });
+        return scouts.get(key);
+      };
+      dates.forEach(date => {
+        const record = records.get(date);
+        const excused = new Set((record.excused || []).map(name => String(name).normalize("NFC").toLocaleLowerCase()));
+        const excuseReasons = new Map((record.excuses || []).map(item => [
+          String(item.name).normalize("NFC").toLocaleLowerCase(), String(item.reason || "")
+        ]));
+        const present = new Set();
+        record.present.forEach(entry => {
+          const key = String(entry.name).normalize("NFC").toLocaleLowerCase();
+          present.add(key);
+          const scout = getScout(entry.name);
+          scout.attended++;
+          scout.eligible++;
+        });
+        record.absent.forEach(name => {
+          const key = String(name).normalize("NFC").toLocaleLowerCase();
+          if (present.has(key)) return;
+          const scout = getScout(name);
+          scout.eligible++;
+          scout.absences.push({ date, excused: excused.has(key), reason: excuseReasons.get(key) || "" });
+        });
+      });
+      const sorted = [...scouts.values()].sort((a, b) =>
+        a.attended / a.eligible - b.attended / b.eligible || a.name.localeCompare(b.name)
+      );
+      $("summary-status").textContent = dates.length + " meeting(s)";
+      sorted.forEach(scout => {
+        const row = document.createElement("div");
+        row.className = "summary-row";
+        const top = document.createElement("div");
+        top.className = "summary-top";
+        const name = document.createElement("strong");
+        name.textContent = scout.name;
+        const rate = document.createElement("strong");
+        rate.textContent = "Attendance rate: " + Math.round(scout.attended / scout.eligible * 100) + "%";
+        top.append(name, rate);
+        const detail = document.createElement("div");
+        detail.className = "muted";
+        detail.textContent = "Attended " + scout.attended + " of " + scout.eligible + " meetings";
+        const absences = document.createElement("div");
+        absences.className = "muted";
+        absences.textContent = "Recent absences: " + (scout.absences.slice(0, 3)
+          .map(item => item.date + (item.excused
+            ? " (" + (item.reason ? "Excused: " + item.reason : "Excused without reason") + ")"
+            : "")).join(", ") || "None");
+        row.append(top, detail, absences);
+        $("summary-list").append(row);
+      });
+      if (!sorted.length) $("summary-status").textContent = "No meetings have been recorded.";
+    } catch (error) {
+      $("summary-status").textContent = "Could not build the attendance summary.";
+    } finally {
+      $("summary-open").disabled = false;
+    }
+  }
+
+  async function changeLeaderPassword(event) {
     event.preventDefault();
-    leaderPassword = $("password").value;
-    await loadDashboard();
-  });
-  $("reload").addEventListener("click", loadDashboard);
-  $("date").addEventListener("change", loadDashboard);
-  $("logout").addEventListener("click", () => {
-    leaderPassword = "";
+    const next = $("new-password").value;
+    if (next.length < 12 || next.length > 128 || next.trim() !== next) {
+      $("password-status").textContent = "Use 12–128 characters with no spaces at the beginning or end.";
+      return;
+    }
+    if (next !== $("confirm-password").value) {
+      $("password-status").textContent = "The passwords do not match.";
+      return;
+    }
+    $("change-password").disabled = true;
+    $("password-status").textContent = "Changing password…";
+    try {
+      const result = await adminRequest("change_password", { newPassword: next });
+      if (!result.ok) {
+        $("password-status").textContent = result.error === "audit"
+          ? "The password change may have applied, but its audit record failed. Test the new display password."
+          : "Could not change the display password.";
+        return;
+      }
+      $("new-password").value = "";
+      $("confirm-password").value = "";
+      $("password-status").textContent = "Display password changed. The admin password is unchanged.";
+      await loadState($("date").value);
+    } catch (error) {
+      $("password-status").textContent = "Could not connect. Verify the display password before retrying.";
+    } finally {
+      $("change-password").disabled = false;
+    }
+  }
+
+  function signOut() {
+    adminPassword = "";
+    clearInterval(tickTimer);
     $("password").value = "";
     $("dashboard").hidden = true;
     $("login").hidden = false;
-    showStatus("");
+    $("qr").replaceChildren();
+    qr = null;
+    status("");
+  }
+
+  $("login").addEventListener("submit", event => {
+    event.preventDefault();
+    adminPassword = $("password").value;
+    loadState();
   });
+  $("refresh").addEventListener("click", () => loadState($("date").value));
+  $("audit-refresh").addEventListener("click", () => loadState($("date").value));
+  $("logout").addEventListener("click", signOut);
+  $("roster").addEventListener("change", () => {
+    $("new-name").hidden = $("roster").value !== NEW;
+    if (!$("new-name").hidden) $("new-name").focus();
+  });
+  $("check-in").addEventListener("click", manualCheckin);
+  $("add-scout").addEventListener("click", addScout);
+  $("date").addEventListener("change", () => loadState($("date").value));
+  $("export").addEventListener("click", downloadCsv);
+  $("summary-open").addEventListener("click", loadSummary);
+  $("summary-back").addEventListener("click", () => {
+    $("summary").hidden = true;
+    $("daily-attendance").hidden = false;
+  });
+  $("password-form").addEventListener("submit", changeLeaderPassword);
 </script>
 </body>
 </html>

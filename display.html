@@ -21,6 +21,7 @@
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #0F1D14; --surface: #172A1E; --ink: #E6EFE2; --muted: #9DB2A3;
@@ -83,8 +84,9 @@
   .ahead button { width: auto; margin: 0; padding: .5rem 1rem; }
   #adate { margin: .9rem 0 0; }
   .acount { font-weight: 700; font-size: 1.15rem; margin: .9rem 0 .25rem; }
-  .arow { display: flex; justify-content: space-between; gap: .75rem; padding: .35rem 0; border-bottom: 1px solid var(--line); }
+  .arow { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem .75rem; padding: .35rem 0; border-bottom: 1px solid var(--line); }
   .arow .t { color: var(--muted); white-space: nowrap; }
+  .arow-actions { display: flex; flex-wrap: wrap; gap: .35rem; }
   .asub { margin: 1.1rem 0 .25rem; font-weight: 700; color: var(--muted); }
   .aabsent { color: var(--muted); padding: .2rem 0; }
   .aexcuse { width: auto; margin: 0; padding: .2rem .65rem; font-size: .85rem; }
@@ -132,6 +134,10 @@
         <input id="mname" type="text" dir="auto" maxlength="60" hidden>
         <button type="button" id="mgo"></button>
         <p class="hint" id="mmsg" role="status"></p>
+        <p id="add-scout-label"></p>
+        <input id="add-scout-name" type="text" dir="auto" maxlength="60">
+        <button type="button" id="add-scout"></button>
+        <p class="hint" id="add-scout-msg" role="status"></p>
       </div>
     </details>
   </section>
@@ -187,12 +193,25 @@
           msum: "تسجيل حضور يدوي (لكشاف بدون هاتف)", mpick: "— اختر الكشاف —", mnew: "➕ اسم جديد",
           mname: "الاسم الثلاثي", mgo: "تسجيل الحضور", mpickErr: "اختر الكشاف أو اكتب اسمه.",
           mbad: "اكتب الاسم الثلاثي بالحروف فقط.", mok: "✓ تم تسجيل حضور", mdup: "مسجَّل بالفعل اليوم:",
+          addScoutLabel: "إضافة اسم إلى قائمة الكشافة بدون تسجيل حضور",
+          addScout: "إضافة إلى القائمة", addScoutPlaceholder: "الاسم الثلاثي",
+          addScoutOk: "✓ تمت إضافة الاسم إلى القائمة:", addScoutDuplicate: "الاسم موجود بالفعل في القائمة:",
+          addScoutError: "تعذّرت إضافة الاسم. حاول مرة أخرى.", addScoutAuditError: "أُضيف الاسم على الأرجح لكن تعذّر تسجيل التغيير. حدّث القائمة للتحقق.",
           abtn: "📋 عرض الحضور", atitle: "سجل الحضور", aclose: "إغلاق", arefresh: "تحديث",
           apresent: "الحاضرون", aof: "من", aabsent: "لم يحضروا", anone: "لا يوجد حضور مسجَّل بعد.", atoday: "اليوم",
-          markExcused: "إضافة عذر", excused: "لديه عذر", excuseError: "تعذّر حفظ العذر. حدّث Apps Script وحاول مرة أخرى.",
+          markExcused: "إضافة عذر بدون سبب", markExcusedReason: "إضافة عذر مع سبب",
+          excused: "معذور", excusedNoReason: "عذر بدون سبب", excuseReasonPrefix: "السبب: ",
+          excuseReasonPrompt: "اكتب سبب العذر (حتى 300 حرف):",
+          editTime: "تعديل الوقت", deleteAttendance: "حذف", confirmDelete: "حذف حضور",
+          timePrompt: "أدخل الوقت الجديد (مثال: 7:30 م):",
+          badTime: "استخدم وقتًا مثل 7:30 م أو 7:30 ص.", staleAttendance: "تغير سجل الحضور. حدّث القائمة وحاول مجددًا.",
+          excuseError: "تعذّر حفظ العذر. حدّث Apps Script وحاول مرة أخرى.",
+          addExcuseReason: "إضافة سبب للعذر", excuseReasonAdded: "✓ تمت إضافة سبب العذر",
+          excuseReasonUpdateError: "تعذّر إضافة سبب العذر. حاول مرة أخرى.",
           auditError: "قد يكون التغيير قد تم، لكن تعذّر تسجيله في سجل التدقيق. تحقق من لوحة الإدارة.",
           exportCsv: "تنزيل CSV", csvDate: "التاريخ", csvName: "الاسم", csvStatus: "الحالة", csvTime: "وقت التسجيل",
-          csvPresent: "حاضر", csvAbsent: "غائب", csvExcused: "بعذر",
+          csvPresent: "حاضر", csvAbsent: "غائب", csvExcused: "بعذر بدون سبب",
+          csvExcusedReason: "بعذر: ",
           summaryOpen: "عرض ملخص الحضور", summaryTitle: "ملخص الحضور", summaryBack: "العودة للحضور اليومي",
           summaryLoading: "جارٍ إعداد الملخص...", summaryMeetings: "اجتماعات", summaryRate: "نسبة الحضور",
           summaryAttended: "حضر", summaryOf: "من", summaryRecent: "آخر الغيابات",
@@ -206,11 +225,24 @@
           msum: "Manual check-in (for a scout without a phone)", mpick: "— Choose the scout —", mnew: "➕ New name",
           mname: "Full name (three parts)", mgo: "Check in", mpickErr: "Choose a scout or type a name.",
           mbad: "Enter a three-part name using letters only.", mok: "✓ Checked in:", mdup: "Already checked in today:",
+          addScoutLabel: "Add a scout to the roster without checking them in",
+          addScout: "Add to roster", addScoutPlaceholder: "Scout's full name",
+          addScoutOk: "✓ Added to roster:", addScoutDuplicate: "Already in the roster:",
+          addScoutError: "Could not add the name. Try again.", addScoutAuditError: "The name may have been added but its audit record failed. Refresh to check.",
           abtn: "📋 Show attendance", atitle: "Attendance", aclose: "Close", arefresh: "Refresh",
           apresent: "Present", aof: "of", aabsent: "Not here", anone: "No one has checked in yet.", atoday: "today",
-          markExcused: "Mark excused", excused: "Excused", excuseError: "Couldn’t save the excuse. Update Apps Script and try again.",
+          markExcused: "Excuse without reason", markExcusedReason: "Excuse with reason",
+          excused: "Excused", excusedNoReason: "Excused without reason", excuseReasonPrefix: "Reason: ",
+          excuseReasonPrompt: "Enter the excuse reason (up to 300 characters):",
+          editTime: "Edit time", deleteAttendance: "Delete", confirmDelete: "Delete attendance",
+          timePrompt: "Enter the new time (for example, 7:30 PM or 7:30 م):",
+          badTime: "Use a time such as 7:30 PM or 7:30 م.", staleAttendance: "This attendance changed. Refresh and try again.",
+          excuseError: "Couldn’t save the excuse. Update Apps Script and try again.",
+          addExcuseReason: "Add reason", excuseReasonAdded: "✓ Reason added to excuse",
+          excuseReasonUpdateError: "Couldn’t add the excuse reason. Try again.",
           exportCsv: "Export CSV", csvDate: "Date", csvName: "Name", csvStatus: "Status", csvTime: "Check-in time",
-          csvPresent: "Present", csvAbsent: "Absent", csvExcused: "Excused",
+          csvPresent: "Present", csvAbsent: "Absent", csvExcused: "Excused without reason",
+          csvExcusedReason: "Excused: ",
           summaryOpen: "Show attendance summary", summaryTitle: "Attendance summary", summaryBack: "Back to daily attendance",
           summaryLoading: "Building summary...", summaryMeetings: "meetings", summaryRate: "Attendance rate",
           summaryAttended: "Attended", summaryOf: "of", summaryRecent: "Recent absences",
@@ -221,6 +253,24 @@
   }[LANG];
 
   const $ = (id) => document.getElementById(id);
+  function displayAttendanceTime(value) {
+    const text = String(value ?? "").trim();
+    const match = text.match(/(\d{1,2}):([0-5]\d)(?::[0-5]\d)?\s*(AM|PM|ص|م)?/i);
+    if (!match) return text;
+
+    let hour = Number(match[1]);
+    const marker = String(match[3] || "").toUpperCase();
+    if (marker === "AM" || marker === "PM") {
+      if (marker === "AM" && hour === 12) hour = 0;
+      if (marker === "PM" && hour < 12) hour += 12;
+    } else if (!marker && hour > 23) {
+      return text;
+    }
+
+    const arabicMarker = marker === "ص" || marker === "م"
+      ? match[3] : hour < 12 ? "ص" : "م";
+    return (hour % 12 || 12) + ":" + match[2] + " " + arabicMarker;
+  }
   document.documentElement.lang = LANG;
   document.documentElement.dir = LANG === "ar" ? "rtl" : "ltr";
   $("support-link").textContent = T.support;
@@ -241,6 +291,9 @@
   $("asummary-title").textContent = T.summaryTitle;
   $("asummary-back").textContent = T.summaryBack;
   $("mname").placeholder = T.mname;
+  $("add-scout-name").placeholder = T.addScoutPlaceholder;
+  $("add-scout-label").textContent = T.addScoutLabel;
+  $("add-scout").textContent = T.addScout;
 
   let password = "", qr = null, lastToken = "", total = 60, endsAt = 0, timer = null;
   let attendanceData = null;
@@ -348,6 +401,7 @@
         list.append(none);
       }
       out.present.forEach((r, i) => {
+        r.time = displayAttendanceTime(r.time);
         const row = document.createElement("div");
         row.className = "arow";
         const n = document.createElement("span");
@@ -355,7 +409,20 @@
         const t = document.createElement("span");
         t.className = "t";
         t.textContent = r.time;
-        row.append(n, t);
+        const actions = document.createElement("div");
+        actions.className = "arow-actions";
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "aexcuse";
+        edit.textContent = T.editTime;
+        edit.addEventListener("click", () => editAttendanceTime(r, edit));
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "aexcuse";
+        remove.textContent = T.deleteAttendance;
+        remove.addEventListener("click", () => deleteAttendance(r, remove));
+        actions.append(edit, remove);
+        row.append(n, t, actions);
         list.append(row);
       });
 
@@ -422,6 +489,9 @@
         const excused = new Set((record.excused || []).map((name) =>
           String(name).normalize("NFC").toLocaleLowerCase()
         ));
+        const excuseReasons = new Map((record.excuses || []).map((item) => [
+          String(item.name).normalize("NFC").toLocaleLowerCase(), String(item.reason || "")
+        ]));
         const present = new Set();
         for (const entry of record.present || []) {
           const key = String(entry.name).normalize("NFC").toLocaleLowerCase();
@@ -435,7 +505,7 @@
           if (present.has(key)) continue;
           const scout = getScout(name);
           scout.eligible++;
-          scout.absences.push({ date, excused: excused.has(key) });
+          scout.absences.push({ date, excused: excused.has(key), reason: excuseReasons.get(key) || "" });
         }
       }
 
@@ -470,7 +540,9 @@
         recent.className = "asummary-detail";
         recent.textContent = T.summaryRecent + ": " +
           (scout.absences.slice(0, 3).map((absence) =>
-            absence.date + (absence.excused ? " (" + T.excused + ")" : "")
+            absence.date + (absence.excused
+              ? " (" + (absence.reason ? T.excuseReasonPrefix + absence.reason : T.excusedNoReason) + ")"
+              : "")
           ).join(", ") || T.summaryNoAbsences);
         row.append(top, detail, recent);
         list.append(row);
@@ -500,8 +572,13 @@
         attendanceData.date, scout.name, T.csvPresent, scout.time
       ]),
       ...attendanceData.absent.map((name) => {
-        const isExcused = excused.has(String(name).normalize("NFC").toLocaleLowerCase());
-        return [attendanceData.date, name, isExcused ? T.csvExcused : T.csvAbsent, ""];
+        const key = String(name).normalize("NFC").toLocaleLowerCase();
+        const excuse = (attendanceData.excuses || []).find((item) =>
+          String(item.name).normalize("NFC").toLocaleLowerCase() === key
+        );
+        const status = !excused.has(key) ? T.csvAbsent
+          : excuse?.reason ? T.csvExcusedReason + excuse.reason : T.csvExcused;
+        return [attendanceData.date, name, status, ""];
       })
     ];
     const csv = "\uFEFF" + rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
@@ -532,24 +609,51 @@
       const label = document.createElement("span");
       label.textContent = name;
       row.append(label);
-      if (excusedSet.has(String(name).normalize("NFC").toLocaleLowerCase())) {
+      const key = String(name).normalize("NFC").toLocaleLowerCase();
+      const reason = (data.excuses || []).find((item) =>
+        String(item.name).normalize("NFC").toLocaleLowerCase() === key
+      )?.reason || "";
+      if (excusedSet.has(key)) {
         const badge = document.createElement("span");
         badge.className = "t";
-        badge.textContent = T.excused;
+        badge.textContent = reason ? T.excuseReasonPrefix + reason : T.excusedNoReason;
         row.append(badge);
-      } else {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "aexcuse";
-        btn.textContent = T.markExcused;
-        btn.addEventListener("click", () => markExcused(name, btn));
-        row.append(btn);
+        if (!reason) {
+          const addReason = document.createElement("button");
+          addReason.type = "button";
+          addReason.className = "aexcuse";
+          addReason.textContent = T.addExcuseReason;
+          addReason.addEventListener("click", () => addExcuseReason(name, addReason));
+          row.append(addReason);
+        }
+      }
+      if (!excusedSet.has(key)) {
+        const actions = document.createElement("div");
+        actions.className = "arow-actions";
+        const withoutReason = document.createElement("button");
+        withoutReason.type = "button";
+        withoutReason.className = "aexcuse";
+        withoutReason.textContent = T.markExcused;
+        withoutReason.addEventListener("click", () => markExcused(name, false, withoutReason));
+        const withReason = document.createElement("button");
+        withReason.type = "button";
+        withReason.className = "aexcuse";
+        withReason.textContent = T.markExcusedReason;
+        withReason.addEventListener("click", () => markExcused(name, true, withReason));
+        actions.append(withoutReason, withReason);
+        row.append(actions);
       }
       ab.append(row);
     });
   }
 
-  async function markExcused(name, button) {
+  async function markExcused(name, hasReason, button) {
+    const reason = hasReason ? prompt(T.excuseReasonPrompt) : "";
+    if (hasReason && (reason === null || !reason.trim())) return;
+    if (hasReason && reason.trim().length > 300) {
+      $("aerr").textContent = T.excuseReasonPrompt;
+      return;
+    }
     button.disabled = true;
     $("aerr").textContent = "";
     $("aok").textContent  = "";
@@ -558,7 +662,8 @@
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({
-          action: "excuse", key: password, name, date: $("adate").value,
+          action: hasReason ? "excuse_reason" : "excuse", key: password, name,
+          reason: hasReason ? reason.trim() : "", date: $("adate").value,
           browser: navigator.userAgent + " | " + navigator.platform
         })
       });
@@ -566,22 +671,115 @@
       if (!out.ok) {
         if (out.error === "denied") { $("att").close(); showLogin(T.wrong, true); return; }
         $("aerr").textContent = out.error === "locked" ? T.mlocked
-          : out.error === "audit" ? T.auditError : T.excuseError;
+            : out.error === "audit" ? T.auditError
+            : out.error === "badreason" ? T.excuseReasonPrompt : T.excuseError;
         button.disabled = false;
         return;
       }
-      // Optimistic update: add to local excused list and immediately re-render
-      // the absent section so the button turns into an "Excused" badge at once.
+      // Update the local excuse state so its reason appears without reloading.
       if (attendanceData) {
-        attendanceData.excused = [...(attendanceData.excused || []), name];
+        const key = String(name).normalize("NFC").toLocaleLowerCase();
+        attendanceData.excuses = (attendanceData.excuses || []).filter((item) =>
+          String(item.name).normalize("NFC").toLocaleLowerCase() !== key
+        );
+        attendanceData.excuses.push({ name, reason: hasReason ? reason.trim() : "" });
+        attendanceData.excused = [...new Set([...(attendanceData.excused || []), name])];
         renderAbsentSection(attendanceData);
       }
       // Show a brief success confirmation (auto-clears after 3 s).
       $("aok").textContent = T.excuseAdded;
       setTimeout(() => { $("aok").textContent = ""; }, 3000);
-      // button is now gone from the DOM (replaced by badge) – no need to re-enable it.
+      // The absent section was re-rendered with the updated reason.
     } catch (e) {
       $("aerr").textContent = T.excuseError;
+      button.disabled = false;
+    }
+  }
+
+  async function addExcuseReason(name, button) {
+    const reason = prompt(T.excuseReasonPrompt);
+    if (reason === null) return;
+    if (!reason.trim() || reason.trim().length > 300) {
+      $("aerr").textContent = T.excuseReasonPrompt;
+      return;
+    }
+    button.disabled = true;
+    $("aerr").textContent = "";
+    $("aok").textContent = "";
+    try {
+      const response = await fetch(SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "add_excuse_reason", key: password, name, reason: reason.trim(),
+          date: $("adate").value,
+          browser: navigator.userAgent + " | " + navigator.platform
+        })
+      });
+      const result = await response.json();
+      if (!result.ok) {
+        if (result.error === "denied") { $("att").close(); showLogin(T.wrong, true); return; }
+        $("aerr").textContent = result.error === "reason_exists"
+          ? T.excuseError : result.error === "audit" ? T.auditError : T.excuseReasonUpdateError;
+        button.disabled = false;
+        return;
+      }
+
+      if (attendanceData) {
+        const key = String(name).normalize("NFC").toLocaleLowerCase();
+        attendanceData.excuses = (attendanceData.excuses || []).map(item =>
+          String(item.name).normalize("NFC").toLocaleLowerCase() === key
+            ? { ...item, reason: reason.trim() } : item
+        );
+        renderAbsentSection(attendanceData);
+      }
+      $("aok").textContent = T.excuseReasonAdded;
+      setTimeout(() => { $("aok").textContent = ""; }, 3000);
+    } catch (error) {
+      $("aerr").textContent = T.excuseReasonUpdateError;
+      button.disabled = false;
+    }
+  }
+
+  async function editAttendanceTime(entry, button) {
+    const time = prompt(T.timePrompt, entry.time);
+    if (time === null) return;
+    if (!/^(0?[1-9]|1[0-2]):[0-5]\d\s*(AM|PM|ص|م)$/i.test(time.trim())) {
+      $("aerr").textContent = T.badTime;
+      return;
+    }
+    await changeAttendance("edit_attendance", entry, button, { time: time.trim() });
+  }
+
+  async function deleteAttendance(entry, button) {
+    if (!confirm(T.confirmDelete + " — " + entry.name + " (" + entry.time + ")?")) return;
+    await changeAttendance("delete_attendance", entry, button);
+  }
+
+  async function changeAttendance(action, entry, button, fields = {}) {
+    button.disabled = true;
+    $("aerr").textContent = "";
+    try {
+      const response = await fetch(SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action, key: password, date: $("adate").value, name: entry.name, row: entry.row,
+          expectedTime: entry.time, ...fields,
+          browser: navigator.userAgent + " | " + navigator.platform
+        })
+      });
+      const out = await response.json();
+      if (!out.ok) {
+        if (out.error === "denied") { $("att").close(); showLogin(T.wrong, true); return; }
+        $("aerr").textContent = out.error === "stale" ? T.staleAttendance
+          : out.error === "badtime" ? T.badTime : T.excuseError;
+        button.disabled = false;
+        return;
+      }
+      await loadAttendance($("adate").value);
+    } catch (e) {
+      $("aerr").textContent = T.net;
       button.disabled = false;
     }
   }
@@ -662,6 +860,45 @@
       msg.textContent = T.net;
     } finally {
       $("mgo").disabled = false;
+    }
+  });
+
+  $("add-scout").addEventListener("click", async () => {
+    const message = $("add-scout-msg");
+    message.className = "hint";
+    message.textContent = "";
+    const name = $("add-scout-name").value.trim().replace(/\s+/g, " ");
+    if (name.length > 60 || name.split(" ").length < 3 || !/^[\p{L}\p{M}\s'’.\-]+$/u.test(name)) {
+      message.textContent = T.mbad;
+      return;
+    }
+
+    $("add-scout").disabled = true;
+    try {
+      const response = await fetch(SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "add_scout", key: password, name,
+          browser: navigator.userAgent + " | " + navigator.platform
+        })
+      });
+      const out = await response.json();
+      if (!out.ok) {
+        if (out.error === "denied") { showLogin(T.wrong, true); return; }
+        message.textContent = out.error === "audit" ? T.addScoutAuditError
+          : out.error === "toomany" ? T.mtoomany
+          : out.error === "badname" ? T.mbad : T.addScoutError;
+        return;
+      }
+      $("add-scout-name").value = "";
+      fillNames(out.names || []);
+      message.className = "hint ok";
+      message.textContent = (out.duplicate ? T.addScoutDuplicate : T.addScoutOk) + " " + name;
+    } catch (error) {
+      message.textContent = T.net;
+    } finally {
+      $("add-scout").disabled = false;
     }
   });
 
