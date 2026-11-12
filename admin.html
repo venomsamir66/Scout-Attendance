@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1F4D2E">
+  <title>Private attendance dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f3f6f4; --card: #fff; --ink: #0e1b14; --muted: #5d6f65; --line: #dfe7e2;
+      --field: #f6f9f7; --accent: #15a14f; --accent-2: #0f7a3b; --accent-soft: #e4f6ea;
+      --gold: #f2b01e; --error: #d93a2f; --error-soft: #fdecea;
+      --shadow: 0 1px 2px rgba(14,27,20,.05), 0 20px 50px -12px rgba(14,27,20,.14);
+      --r: 16px; --t: .2s cubic-bezier(.4,0,.2,1);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #09120d; --card: #111d16; --ink: #eef5f0; --muted: #8fa398; --line: #1f3027;
+        --field: #0c1711; --accent: #2fd16f; --accent-2: #1fa958; --accent-soft: #14301f;
+        --error: #ff7a70; --error-soft: #2c1513;
+        --shadow: 0 1px 2px rgba(0,0,0,.4), 0 24px 60px -12px rgba(0,0,0,.6);
+      }
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; min-height: 100svh; color: var(--ink); -webkit-font-smoothing: antialiased;
+      background: radial-gradient(60rem 28rem at 50% -8rem, var(--accent-soft), transparent 70%), var(--bg);
+      font: 16px/1.6 "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+    }
+    h1, h2, h3 { line-height: 1.25; margin: 0; }
+    input, select, button { font: inherit; border-radius: var(--r); min-height: 3rem; padding: .7rem 1rem; }
+    input, select {
+      width: 100%; max-width: 100%; color: var(--ink); background: var(--field); border: 1.5px solid var(--line);
+      transition: border-color var(--t), box-shadow var(--t), background var(--t);
+    }
+    input::placeholder { color: var(--muted); opacity: .75; }
+    input:focus-visible, select:focus-visible {
+      outline: none; border-color: var(--accent); background: var(--card);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+    }
+    select {
+      -webkit-appearance: none; appearance: none; padding-inline-end: 2.6rem;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9' fill='none' stroke='%238a9a91' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 1rem center;
+    }
+    [dir="rtl"] select { background-position: left 1rem center; }
+    select option { background: var(--card); color: var(--ink); }
+    button {
+      border: 0; cursor: pointer; font-weight: 700; color: #fff; width: auto;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 8px 20px -8px var(--accent);
+      transition: transform var(--t), filter var(--t), background var(--t);
+    }
+    button:not(:disabled):hover { filter: brightness(1.07); transform: translateY(-1px); }
+    button:not(:disabled):active { transform: scale(.985); }
+    button:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+    button[aria-busy="true"] { display: inline-flex; align-items: center; justify-content: center; gap: .55rem; }
+    button[aria-busy="true"]::before {
+      content: ""; flex: none; width: 1rem; height: 1rem; border: 2px solid currentColor;
+      border-inline-end-color: transparent; border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+    button.secondary {
+      background: transparent; color: var(--ink); border: 1.5px solid var(--line); box-shadow: none; font-weight: 600;
+    }
+    button.secondary:not(:disabled):hover { background: var(--field); filter: none; border-color: var(--accent); }
+    .error { color: var(--error); font-weight: 600; }
+    .error:not(:empty) { background: var(--error-soft); border-radius: 12px; padding: .65rem .9rem; }
+    .brand {
+      flex: none; width: 2.8rem; height: 2.8rem; border-radius: 14px; display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 8px 20px -6px var(--accent);
+    }
+    .brand svg { width: 1.45rem; height: 1.45rem; stroke: #fff; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    #qrbox { background: #fff; padding: 14px; display: inline-block; border-radius: 22px; box-shadow: var(--shadow); border: 1px solid var(--line); direction: ltr; }
+    #qr img, #qr canvas { display: block; max-width: 100%; height: auto !important; }
+    #qrbox { max-width: 100%; }
+    .code {
+      display: inline-block; direction: ltr; white-space: nowrap; margin: 0 0 1.1rem; padding: .35em .6em .35em .75em;
+      font: 700 clamp(2rem, 11vw, 3.2rem)/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .14em;
+      background: var(--accent-soft); color: var(--accent-2); border-radius: 20px;
+    }
+    @media (prefers-color-scheme: dark) { .code { color: var(--accent); } }
+    .bar { height: 8px; max-width: 18rem; margin: 1.1rem auto 0; background: var(--line); border-radius: 99px; overflow: hidden; }
+    .bar > div { height: 100%; width: 100%; background: linear-gradient(90deg, var(--accent), var(--gold)); border-radius: 99px; transition: width 1s linear; }
+    .hint, .muted { color: var(--muted); }
+    .support-link { margin-inline-start: .4rem; color: inherit; text-decoration: none; }
+    .support-link:hover { text-decoration: underline; }
+    [hidden] { display: none !important; }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+    body { padding: 0 0 3rem; }
+    main { width: min(100% - 2rem, 76rem); margin: 0 auto; padding-top: max(env(safe-area-inset-top), 1.5rem); }
+    .top { display: flex; align-items: center; gap: .9rem; margin-bottom: .5rem; }
+    h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.1rem; margin-bottom: .8rem; }
+    .notice { font-size: .85rem; margin: .25rem 0 1.25rem; max-width: 52rem; }
+    section, form.panel { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 1.25rem; margin: 0; box-shadow: var(--shadow); }
+    #login { display: flex; flex-wrap: wrap; gap: .6rem; max-width: 30rem; }
+    #login input { flex: 1 1 14rem; }
+    #status { color: var(--muted); min-height: 1.5rem; margin: .75rem 0; }
+    #status.error { color: var(--error); }
+    #dashboard { display: grid; gap: 1.1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+    .toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .75rem; margin-bottom: .5rem; }
+    .toolbar h2 { margin: 0; }
+    .toolbar label { display: flex; align-items: center; gap: .6rem; font-weight: 600; font-size: .9rem; }
+    .toolbar label select { width: auto; min-height: 2.6rem; }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+    .row > input, .row > select { flex: 1 1 12rem; width: auto; }
+    #manual-section h2:not(:first-child) { margin-top: 1.4rem; }
+    #manual-section p, #password-section p { font-size: .88rem; margin: .5rem 0 0; min-height: 1.2rem; }
+    .qr-area { text-align: center; }
+    .qr-area .toolbar { text-align: start; margin-bottom: 1rem; }
+    .qr-area .code { margin-top: .25rem; }
+    #qr-hint { font-size: .88rem; margin: 1rem 0 0; }
+    .scroll { overflow-x: auto; margin-inline: -.25rem; padding-inline: .25rem; }
+    table { width: 100%; border-collapse: collapse; text-align: start; font-size: .88rem; }
+    th, td { padding: .7rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { white-space: nowrap; color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+    tbody tr:hover { background: var(--field); }
+    td.device { min-width: 14rem; overflow-wrap: anywhere; font-size: .8rem; color: var(--muted); }
+    #attendance-count { font-weight: 600; margin: .25rem 0 .5rem; }
+    .arow { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .6rem; padding: .6rem .2rem; border-bottom: 1px solid var(--line); }
+    .arow:last-child { border-bottom: 0; }
+    .arow > span:first-child { font-weight: 600; }
+    .arow .time, .arow .attendance-status { color: var(--muted); font-size: .88rem; }
+    .arow .time { white-space: nowrap; }
+    .arow button { min-height: 2.2rem; padding: .3rem .8rem; font-size: .85rem; border-radius: 10px; }
+    .arow-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .roster-managed { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; padding: .55rem .2rem; border-bottom: 1px solid var(--line); }
+    .roster-managed:last-child { border-bottom: 0; }
+    .roster-managed > span { overflow-wrap: anywhere; font-weight: 600; }
+    .roster-managed .row { gap: .4rem; }
+    .roster-managed button { min-height: 2.2rem; padding: .3rem .8rem; font-size: .85rem; border-radius: 10px; }
+    .roster-list { margin-top: .5rem; }
+    #attendance-actions { margin-top: 1rem; }
+    .summary-row { padding: .8rem .2rem; border-bottom: 1px solid var(--line); }
+    .summary-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; }
+    @media print {
+      #login, #status, #manual-section, #audit-section, #password-section, #attendance-actions { display: none !important; }
+      body { background: white; color: black; }
+    }
+    main { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
+    #dashboard { display: block; }
+    #dashboard > section { max-width: 56rem; margin: 0 auto; animation: rise .35s var(--t) both; }
+    #dashboard > #sec-qr { max-width: 32rem; }
+    #dashboard > #audit-section { max-width: none; }
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    nav#tabs { position: fixed; inset-inline: 0; bottom: 0; z-index: 20; display: flex; justify-content: center;
+      padding: .5rem .75rem calc(.5rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--line);
+      background: color-mix(in srgb, var(--card) 88%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+    .tabs-in { display: flex; gap: .25rem; width: 100%; max-width: 36rem; }
+    .tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; min-height: 3.6rem;
+      padding: .4rem .2rem; border-radius: 16px; background: transparent; color: var(--muted); box-shadow: none; font-size: .72rem; font-weight: 600; }
+    .tab svg { width: 1.45rem; height: 1.45rem; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .tab:not(:disabled):hover { transform: none; filter: none; background: var(--field); }
+    .tab[aria-selected="true"] { color: var(--accent-2); background: var(--accent-soft); }
+    @media (prefers-color-scheme: dark) { .tab[aria-selected="true"] { color: var(--accent); } }
+    button.danger { background: linear-gradient(135deg, #e5484d, #b3261e); box-shadow: 0 8px 20px -8px #e5484d; }
+    #maint-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; max-width: 56rem; margin: 0 auto 1rem; padding: .8rem 1rem; border-radius: 16px; background: var(--gold); color: #3b2a00; font-weight: 700; }
+    #maint-banner button { min-height: 2.4rem; padding: .3rem 1rem; background: #3b2a00; color: #fff; box-shadow: none; }
+    @media print { nav#tabs { display: none !important; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="top"><span class="brand" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><h1>Attendance dashboard</h1></div>
+  <form id="login" class="login">
+    <input id="password" type="password" autocomplete="current-password" placeholder="Private admin password" required>
+    <button id="sign-in" type="submit">Sign in</button>
+  </form>
+  <p id="status" role="status" aria-live="polite"></p>
+
+  <div id="dashboard" hidden>
+    <div id="maint-banner" hidden><span>Maintenance mode is ON. Scouts and the display are blocked.</span><button type="button" id="maint-off">Turn off</button></div>
+
+    <section class="qr-area" id="sec-qr">
+      <div class="toolbar">
+        <h2>Meeting QR code</h2>
+        <div class="row">
+          <button id="refresh" class="secondary" type="button">Refresh</button>
+          <button id="logout" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+      <div class="code" id="code"></div>
+      <div id="qrbox"><div id="qr"></div></div>
+      <div class="bar"><div id="fill"></div></div>
+      <p class="muted" id="qr-hint">Scan the QR code to check in. The meeting code changes automatically.</p>
+    </section>
+
+    <section id="manual-section" hidden>
+      <h2>Manual check-in (and add a scout)</h2>
+      <div class="row">
+        <select id="roster" aria-label="Scout"></select>
+        <input id="new-name" type="text" maxlength="60" placeholder="New scout's full name" hidden>
+        <button id="check-in" type="button">Check in</button>
+      </div>
+      <p id="manual-status" class="muted" role="status"></p>
+      <h2>Add a name to the roster</h2>
+      <div class="row">
+        <input id="add-scout-name" type="text" maxlength="60" placeholder="Scout's full name (no check-in)">
+        <button id="add-scout" type="button">Add name</button>
+      </div>
+      <p id="add-scout-status" class="muted" role="status"></p>
+      <h2>Roster names</h2>
+      <p id="roster-status" class="muted" role="status"></p>
+      <div id="roster-list" class="roster-list"></div>
+    </section>
+
+    <section id="sec-att" hidden>
+      <div id="daily-attendance">
+        <div class="toolbar">
+          <h2>Attendance</h2>
+          <label>Meeting date <select id="date"></select></label>
+        </div>
+        <p id="attendance-count" class="muted"></p>
+        <div id="attendance-list"></div>
+        <p id="attendance-error" class="error" role="alert"></p>
+        <div class="row" id="attendance-actions">
+          <button id="export" class="secondary" type="button" disabled>Export CSV</button>
+          <button id="summary-open" class="secondary" type="button" disabled>Attendance summary</button>
+        </div>
+      </div>
+      <div id="summary" hidden>
+        <div class="toolbar">
+          <h2>Attendance summary</h2>
+          <button id="summary-back" class="secondary" type="button">Back to daily attendance</button>
+        </div>
+        <p id="summary-status" class="muted" role="status"></p>
+        <div id="summary-list"></div>
+      </div>
+    </section>
+
+    <section id="audit-section" hidden>
+      <div class="toolbar">
+        <h2>Change history (latest 500)</h2>
+        <button id="audit-refresh" class="secondary" type="button">Refresh history</button>
+      </div>
+      <p class="notice muted">Successful check-ins, roster additions, excuses, attendance edits/deletions, display-password changes, and automatic time-format repairs are recorded below. Direct spreadsheet edits and rejected requests are not included. The dashboard shows the latest 500 changes.</p>
+      <div class="scroll"><table>
+        <thead><tr><th>Changed at</th><th>Change</th><th>Recorded as</th><th>Meeting date</th><th>Name / detail</th><th>Device / browser</th></tr></thead>
+        <tbody id="audit-rows"></tbody>
+      </table></div>
+    </section>
+
+    <section id="password-section" hidden>
+      <h2>Maintenance mode</h2>
+      <p class="muted">Turn the app off while you work on it. Scouts and the leader display will see an "under maintenance" message and nothing can be changed, except from this admin page.</p>
+      <div class="row" style="margin-top:.8rem">
+        <button id="maint-toggle" type="button">Turn on maintenance mode</button>
+      </div>
+      <p id="maint-status" class="muted" role="status"></p>
+      <hr style="border:0;border-top:1px solid var(--line);margin:1.4rem 0">
+      <h2>Change leader/display password</h2>
+      <p class="muted">This changes the password used to open the existing leader display. The admin password stays separate.</p>
+      <form id="password-form">
+        <div class="row">
+          <input id="new-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" placeholder="New display password (12+ characters)" required>
+          <input id="confirm-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" placeholder="Confirm new password" required>
+          <button id="change-password" type="submit">Change display password</button>
+        </div>
+        <p id="password-status" class="muted" role="status"></p>
+      </form>
+    </section>
+    <nav id="tabs" aria-label="Sections"><div class="tabs-in"><button type="button" class="tab" data-tab="qr" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3m4 0v4h-4m0-4h-.01M14 21h.01"/></svg><span>QR code</span></button><button type="button" class="tab" data-tab="att" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Attendance</span></button><button type="button" class="tab" data-tab="manual" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/></svg><span>Check in</span></button><button type="button" class="tab" data-tab="audit" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>History</span></button><button type="button" class="tab" data-tab="pw" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Settings</span></button></div></nav>
+  </div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzHuT96lN2SpUvKUu_ibgIgMxehFNJ79FFlpnvn-XNh_jW1E8pmZJzZZzlDHRVe90MqZA/exec";
+  const CHECKIN_URL = "https://venomsamir66.github.io/Scout-Attendance/";
+  const $ = id => document.getElementById(id);
+  function setButtonBusy(button, busy) {
+    if (busy) button.setAttribute("aria-busy", "true");
+    else button.removeAttribute("aria-busy");
+  }
+  const NEW = "__new__";
+  function displayAttendanceTime(value) {
+    const text = String(value ?? "").trim();
+    const match = text.match(/(\d{1,2}):([0-5]\d)(?::[0-5]\d)?\s*(AM|PM|ص|م)?/i);
+    if (!match) return text;
+
+    let hour = Number(match[1]);
+    const marker = String(match[3] || "").toUpperCase();
+    if (marker === "AM" || marker === "PM") {
+      if (marker === "AM" && hour === 12) hour = 0;
+      if (marker === "PM" && hour < 12) hour += 12;
+    } else if (!marker && hour > 23) {
+      return text;
+    }
+
+    const arabicMarker = marker === "ص" || marker === "م"
+      ? match[3] : hour < 12 ? "ص" : "م";
+    return (hour % 12 || 12) + ":" + match[2] + " " + arabicMarker;
+  }
+  let adminPassword = "";
+  let attendanceData = null;
+  let qr = null;
+  let token = "";
+  let secondsLeft = 0;
+  let tickTimer = null;
+
+  function status(message, error = false) {
+    $("status").textContent = message;
+    $("status").className = error ? "error" : "";
+  }
+
+  function escapeCsv(value) {
+    const text = String(value ?? "");
+    const safe = /^[\t\r\n ]*[=+\-@]/.test(text) ? "'" + text : text;
+    return '"' + safe.replace(/"/g, '""') + '"';
+  }
+
+  async function adminRequest(command, fields = {}) {
+    const response = await fetch(SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "admin", command, key: adminPassword,
+        browser: navigator.userAgent + " | " + navigator.platform,
+        ...fields
+      })
+    });
+    return response.json();
+  }
+
+  function drawToken(value) {
+    token = value;
+    $("code").textContent = value.slice(0, 3) + " " + value.slice(3);
+    const url = CHECKIN_URL + (CHECKIN_URL.includes("?") ? "&" : "?") + "t=" + value;
+    const size = Math.min(360, Math.floor(Math.min(innerWidth, innerHeight) * .65));
+    if (!qr) qr = new QRCode($("qr"), { text: url, width: size, height: size, correctLevel: QRCode.CorrectLevel.M });
+    else qr.makeCode(url);
+  }
+
+  function startCountdown(seconds, windowSeconds) {
+    clearInterval(tickTimer);
+    secondsLeft = seconds;
+    const total = windowSeconds || 600;
+    const paint = () => {
+      $("fill").style.width = Math.max(0, Math.min(100, secondsLeft / total * 100)) + "%";
+    };
+    paint();
+    tickTimer = setInterval(() => {
+      secondsLeft = Math.max(0, secondsLeft - 1);
+      paint();
+      if (!secondsLeft) {
+        clearInterval(tickTimer);
+        loadState();
+      }
+    }, 1000);
+  }
+
+  function fillRoster(names) {
+    const select = $("roster");
+    const keep = select.value;
+    select.replaceChildren(new Option("— Choose scout —", ""));
+    names.forEach(name => select.add(new Option(name, name)));
+    select.add(new Option("➕ Add a new scout", NEW));
+    select.value = names.includes(keep) || keep === NEW ? keep : "";
+    $("new-name").hidden = select.value !== NEW;
+    renderRosterManagement(names);
+  }
+
+  function renderRosterManagement(names) {
+    const list = $("roster-list");
+    list.replaceChildren();
+    $("roster-status").textContent = names.length ? names.length + " name(s)" : "No names in the roster.";
+    names.forEach(name => {
+      const item = document.createElement("div");
+      item.className = "roster-managed";
+      const label = document.createElement("span");
+      label.textContent = name;
+      const actions = document.createElement("div");
+      actions.className = "row";
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "secondary";
+      edit.textContent = "Edit";
+      edit.addEventListener("click", () => editRosterName(name, edit));
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "secondary";
+      remove.textContent = "Delete";
+      remove.addEventListener("click", () => deleteRosterName(name, remove));
+      actions.append(edit, remove);
+      item.append(label, actions);
+      list.append(item);
+    });
+  }
+
+  function addCell(row, value, className) {
+    const td = document.createElement("td");
+    td.textContent = value;
+    if (className) td.className = className;
+    row.append(td);
+  }
+
+  function renderAttendance(data) {
+    attendanceData = data;
+    const dateSelect = $("date");
+    const selected = data.date;
+    dateSelect.replaceChildren();
+    data.dates.forEach(date => dateSelect.add(new Option(date === data.today ? date + " (today)" : date, date)));
+    dateSelect.value = selected;
+    $("attendance-count").textContent = "Present: " + data.present.length + (data.total ? " / " + data.total : "");
+    $("attendance-list").replaceChildren();
+    $("attendance-error").textContent = "";
+    const excused = new Set((data.excused || []).map(name => String(name).normalize("NFC").toLocaleLowerCase()));
+    const present = data.present || [];
+    const excuses = new Map((data.excuses || []).map(item => [
+      String(item.name).normalize("NFC").toLocaleLowerCase(), String(item.reason || "")
+    ]));
+    if (!present.length && !data.absent.length) {
+      $("attendance-list").textContent = "No attendance recorded for this date.";
+    }
+    present.forEach((entry, index) => {
+      entry.time = displayAttendanceTime(entry.time);
+      const row = document.createElement("div");
+      row.className = "arow";
+      const name = document.createElement("span");
+      name.textContent = (index + 1) + ". " + entry.name;
+      const time = document.createElement("span");
+      time.className = "time";
+      time.textContent = entry.time;
+      const actions = document.createElement("div");
+      actions.className = "arow-actions";
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "secondary";
+      edit.textContent = "Edit time";
+      edit.addEventListener("click", () => editAttendanceTime(entry, edit));
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "secondary";
+      remove.textContent = "Delete";
+      remove.addEventListener("click", () => deleteAttendance(entry, remove));
+      actions.append(edit, remove);
+      row.append(name, time, actions);
+      $("attendance-list").append(row);
+    });
+    data.absent.forEach(name => {
+      const row = document.createElement("div");
+      row.className = "arow";
+      const label = document.createElement("span");
+      const key = String(name).normalize("NFC").toLocaleLowerCase();
+      const isExcused = excused.has(key);
+      const reason = excuses.get(key) || "";
+      label.textContent = name + (isExcused
+        ? reason ? " — Excused: " + reason : " — Excused without reason"
+        : " — Absent");
+      row.append(label);
+      if (isExcused && !reason) {
+        const addReason = document.createElement("button");
+        addReason.type = "button";
+        addReason.className = "secondary";
+        addReason.textContent = "Add reason";
+        addReason.addEventListener("click", () => addExcuseReason(name, addReason));
+        row.append(addReason);
+      } else if (!isExcused) {
+        const actions = document.createElement("div");
+        actions.className = "arow-actions";
+        const withoutReason = document.createElement("button");
+        withoutReason.type = "button";
+        withoutReason.className = "secondary";
+        withoutReason.textContent = "Excuse without reason";
+        withoutReason.addEventListener("click", () => markExcused(name, false, withoutReason));
+        const withReason = document.createElement("button");
+        withReason.type = "button";
+        withReason.className = "secondary";
+        withReason.textContent = "Excuse with reason";
+        withReason.addEventListener("click", () => markExcused(name, true, withReason));
+        actions.append(withoutReason, withReason);
+        row.append(actions);
+      }
+      $("attendance-list").append(row);
+    });
+    $("export").disabled = false;
+    $("summary-open").disabled = false;
+  }
+
+  function renderAudit(events) {
+    const tbody = $("audit-rows");
+    tbody.replaceChildren();
+    if (!events.length) {
+      const row = tbody.insertRow();
+      const cell = row.insertCell();
+      cell.colSpan = 6;
+      cell.textContent = "No changes have been recorded yet.";
+      return;
+    }
+    const labels = {
+      checkin: "Check-in", excuse: "Excuse without reason", excuse_reason: "Excuse with reason",
+      excuse_reason_added: "Reason added to excuse",
+      attendance_edit: "Attendance time edited", attendance_delete: "Attendance deleted",
+      attendance_time_normalized: "Attendance times converted to Arabic",
+      roster_add: "Scout added to roster",
+      roster_edit: "Roster name edited", roster_delete: "Scout removed from roster",
+      password_change: "Display password changed"
+    };
+    events.forEach(event => {
+      const row = tbody.insertRow();
+      addCell(row, event.changedAt);
+      addCell(row, labels[event.action] || event.action);
+      addCell(row, event.actor === "admin" ? "Admin"
+        : event.actor === "leader" ? "Leader"
+        : event.actor === "system" ? "System" : "Scout");
+      addCell(row, event.date);
+      addCell(row, event.name);
+      addCell(row, event.browser || "—", "device");
+    });
+  }
+
+  async function loadState(date, sourceButton) {
+    if (!adminPassword) return;
+    $("refresh").disabled = true;
+    setButtonBusy($("refresh"), true);
+    if (sourceButton && sourceButton !== $("refresh")) {
+      sourceButton.disabled = true;
+      setButtonBusy(sourceButton, true);
+    }
+    status("");
+    try {
+      const result = await adminRequest("state", { date: date || $("date").value });
+      if (!result.ok) {
+        if (result.error === "denied" || result.error === "locked" || result.error === "admin_unconfigured") {
+          const messages = {
+            denied: "Incorrect admin password.",
+            locked: "Too many attempts. Try again later.",
+            admin_unconfigured: "Set ADMIN_PASSWORD in Apps Script Script properties first."
+          };
+          if (result.error === "denied") signOut();
+          status(messages[result.error], true);
+        } else status("Could not load the dashboard.", true);
+        return;
+      }
+      $("login").hidden = true;
+      $("dashboard").hidden = false;
+      drawToken(result.token);
+      startCountdown(result.secondsLeft, result.windowSeconds);
+      fillRoster(result.names || []);
+      renderAttendance(result.attendance);
+      renderAudit(result.events || []);
+      renderMaintenance(result.maintenance);
+    } catch (error) {
+      status("Could not connect to the attendance service. Try again.", true);
+    } finally {
+      $("refresh").disabled = false;
+      setButtonBusy($("refresh"), false);
+      if (sourceButton && sourceButton !== $("refresh")) {
+        sourceButton.disabled = false;
+        setButtonBusy(sourceButton, false);
+      }
+    }
+  }
+
+  async function markExcused(name, hasReason, button) {
+    const reason = hasReason ? prompt("Enter the excuse reason (up to 300 characters):") : "";
+    if (hasReason && (reason === null || !reason.trim())) return;
+    if (hasReason && reason.trim().length > 300) {
+      $("attendance-error").textContent = "Enter a reason of 1–300 characters.";
+      return;
+    }
+    button.disabled = true;
+    setButtonBusy(button, true);
+    $("attendance-error").textContent = "";
+    try {
+      const result = await adminRequest(hasReason ? "excuse_reason" : "excuse", {
+        name, date: $("date").value, reason: hasReason ? reason.trim() : ""
+      });
+      if (!result.ok) throw new Error(result.error || "request");
+      await loadState($("date").value);
+    } catch (error) {
+      $("attendance-error").textContent = error.message === "audit"
+        ? "The excuse may have been saved but its audit record failed. Refresh to check."
+        : error.message === "badreason" ? "Enter a reason of 1–300 characters."
+        : "Could not save the excuse.";
+      button.disabled = false;
+      setButtonBusy(button, false);
+    }
+  }
+
+  async function addExcuseReason(name, button) {
+    const reason = prompt("Enter the excuse reason (up to 300 characters):");
+    if (reason === null) return;
+    if (!reason.trim() || reason.trim().length > 300) {
+      $("attendance-error").textContent = "Enter a reason of 1–300 characters.";
+      return;
+    }
+    button.disabled = true;
+    setButtonBusy(button, true);
+    $("attendance-error").textContent = "";
+    try {
+      const result = await adminRequest("add_excuse_reason", {
+        name, date: $("date").value, reason: reason.trim()
+      });
+      if (!result.ok) throw new Error(result.error || "request");
+      await loadState($("date").value);
+    } catch (error) {
+      $("attendance-error").textContent = error.message === "audit"
+        ? "The reason may have been saved but its audit record failed. Refresh to check."
+        : error.message === "reason_exists" ? "A reason has already been saved for this excuse."
+        : error.message === "no_excuse" ? "This excuse was not found. Refresh and try again."
+        : error.message === "badreason" ? "Enter a reason of 1–300 characters."
+        : "Could not add the excuse reason.";
+      button.disabled = false;
+      setButtonBusy(button, false);
+    }
+  }
+
+  async function editAttendanceTime(entry, button) {
+    const time = prompt("Enter the new time (for example, 7:30 م or 7:30 PM):", entry.time);
+    if (time === null) return;
+    if (!/^(0?[1-9]|1[0-2]):[0-5]\d\s*(AM|PM|ص|م)$/i.test(time.trim())) {
+      $("attendance-error").textContent = "Use a time such as 7:30 م or 7:30 PM.";
+      return;
+    }
+    await changeAttendance("edit_attendance", entry, button, { time: time.trim() });
+  }
+
+  async function deleteAttendance(entry, button) {
+    if (!confirm("Delete " + entry.name + "'s attendance at " + entry.time + "?")) return;
+    await changeAttendance("delete_attendance", entry, button);
+  }
+
+  async function changeAttendance(command, entry, button, fields = {}) {
+    button.disabled = true;
+    setButtonBusy(button, true);
+    $("attendance-error").textContent = "";
+    try {
+      const result = await adminRequest(command, {
+        date: $("date").value, name: entry.name, row: entry.row, expectedTime: entry.time, ...fields
+      });
+      if (!result.ok) throw new Error(result.error || "request");
+      await loadState($("date").value);
+    } catch (error) {
+      $("attendance-error").textContent = error.message === "audit"
+        ? "The attendance change may have saved but its audit record failed. Refresh to check."
+        : error.message === "stale" ? "This attendance changed elsewhere. Refresh and try again."
+        : error.message === "badtime" ? "Use a time such as 7:30 م or 7:30 PM."
+        : "Could not update attendance.";
+      button.disabled = false;
+      setButtonBusy(button, false);
+    }
+  }
+
+  async function manualCheckin() {
+    const isNew = $("roster").value === NEW;
+    const name = (isNew ? $("new-name").value : $("roster").value).trim().replace(/\s+/g, " ");
+    const message = $("manual-status");
+    message.textContent = "";
+    if (!name) { message.textContent = "Choose a scout or enter a name."; return; }
+    if (isNew && (name.split(" ").length < 3 || !/^[\p{L}\p{M}\s'’.\-]+$/u.test(name))) {
+      message.textContent = "Enter the scout's full name using letters only.";
+      return;
+    }
+    $("check-in").disabled = true;
+    setButtonBusy($("check-in"), true);
+    try {
+      const result = await adminRequest("checkin", { name, isNew });
+      if (!result.ok) {
+        const errors = {
+          badname: "Enter the scout's full name using letters only.",
+          toomany: "Too many new names were added recently.",
+          audit: "The check-in may have saved but its audit record failed. Refresh to check."
+        };
+        message.textContent = errors[result.error] || "Could not check in this scout.";
+        return;
+      }
+      message.textContent = result.duplicate ? name + " is already checked in today." : "Checked in: " + name;
+      $("roster").value = "";
+      $("new-name").value = "";
+      $("new-name").hidden = true;
+      await loadState($("date").value);
+    } catch (error) {
+      message.textContent = "Could not connect. Refresh and check attendance before retrying.";
+    } finally {
+      $("check-in").disabled = false;
+      setButtonBusy($("check-in"), false);
+    }
+  }
+
+  async function addScout() {
+    const name = $("add-scout-name").value.trim().replace(/\s+/g, " ");
+    const message = $("add-scout-status");
+    message.textContent = "";
+    if (name.length > 60 || name.split(" ").length < 3 || !/^[\p{L}\p{M}\s'’.\-]+$/u.test(name)) {
+      message.textContent = "Enter the scout's full name using letters only.";
+      return;
+    }
+    $("add-scout").disabled = true;
+    setButtonBusy($("add-scout"), true);
+    try {
+      const result = await adminRequest("add_scout", { name });
+      if (!result.ok) {
+        const errors = {
+          badname: "Enter the scout's full name using letters only.",
+          toomany: "Too many new names were added recently.",
+          audit: "The name may have been added but its audit record failed. Refresh to check."
+        };
+        message.textContent = errors[result.error] || "Could not add this name.";
+        return;
+      }
+      $("add-scout-name").value = "";
+      fillRoster(result.names || []);
+      message.textContent = result.duplicate ? name + " is already in the roster." : "Added to roster: " + name;
+      await loadState($("date").value);
+    } catch (error) {
+      message.textContent = "Could not connect. Refresh and check the roster before retrying.";
+    } finally {
+      $("add-scout").disabled = false;
+      setButtonBusy($("add-scout"), false);
+    }
+  }
+
+  async function editRosterName(oldName, button) {
+    const newName = prompt("Enter the scout's new full name:", oldName);
+    if (newName === null) return;
+    const normalizedName = newName.trim().replace(/\s+/g, " ");
+    if (normalizedName.length > 60 || normalizedName.split(" ").length < 3 ||
+        !/^[\p{L}\p{M}\s'’.\-]+$/u.test(normalizedName)) {
+      $("roster-status").textContent = "Enter the scout's full name using letters only.";
+      return;
+    }
+    button.disabled = true;
+    setButtonBusy(button, true);
+    $("roster-status").textContent = "";
+    try {
+      const result = await adminRequest("edit_scout", { name: oldName, newName: normalizedName });
+      if (!result.ok) {
+        $("roster-status").textContent = result.error === "duplicate"
+          ? "That name is already in the roster."
+          : result.error === "no_scout" ? "This name is no longer in the roster. Refresh and try again."
+          : result.error === "audit" ? "The name may have changed, but its audit record failed. Refresh to check."
+          : "Could not edit this name.";
+        return;
+      }
+      fillRoster(result.names || []);
+      $("roster-status").textContent = "Roster name updated. Past attendance records were not changed.";
+    } catch (error) {
+      $("roster-status").textContent = "Could not connect. Refresh and check the roster before retrying.";
+    } finally {
+      button.disabled = false;
+      setButtonBusy(button, false);
+    }
+  }
+
+  async function deleteRosterName(name, button) {
+    if (!confirm("Remove " + name + " from the roster? Past attendance and excuses will be kept.")) return;
+    button.disabled = true;
+    setButtonBusy(button, true);
+    $("roster-status").textContent = "";
+    try {
+      const result = await adminRequest("delete_scout", { name });
+      if (!result.ok) {
+        $("roster-status").textContent = result.error === "no_scout"
+          ? "This name is no longer in the roster. Refresh and try again."
+          : result.error === "audit" ? "The name may have been removed, but its audit record failed. Refresh to check."
+          : "Could not remove this name.";
+        return;
+      }
+      fillRoster(result.names || []);
+      $("roster-status").textContent = "Roster name removed. Past attendance records were kept.";
+    } catch (error) {
+      $("roster-status").textContent = "Could not connect. Refresh and check the roster before retrying.";
+    } finally {
+      button.disabled = false;
+      setButtonBusy(button, false);
+    }
+  }
+
+  function downloadCsv() {
+    if (!attendanceData) return;
+    const excused = new Set((attendanceData.excused || []).map(name => String(name).normalize("NFC").toLocaleLowerCase()));
+    const excuses = new Map((attendanceData.excuses || []).map(item => [
+      String(item.name).normalize("NFC").toLocaleLowerCase(), String(item.reason || "")
+    ]));
+    const rows = [
+      ["Date", "Name", "Status", "Check-in time"],
+      ...attendanceData.present.map(entry => [attendanceData.date, entry.name, "Present", entry.time]),
+      ...attendanceData.absent.map(name => {
+        const key = String(name).normalize("NFC").toLocaleLowerCase();
+        const reason = excuses.get(key);
+        const label = !excused.has(key) ? "Absent"
+          : reason ? "Excused: " + reason : "Excused without reason";
+        return [attendanceData.date, name, label, ""];
+      })
+    ];
+    const csv = "\uFEFF" + rows.map(row => row.map(escapeCsv).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "attendance-" + attendanceData.date + ".csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function loadSummary() {
+    $("daily-attendance").hidden = true;
+    $("summary").hidden = false;
+    $("summary-status").textContent = "Building attendance summary…";
+    $("summary-list").replaceChildren();
+    $("summary-open").disabled = true;
+    setButtonBusy($("summary-open"), true);
+    try {
+      const dates = [...new Set(attendanceData?.dates || [])].sort((a, b) => b.localeCompare(a));
+      const records = new Map();
+      if (attendanceData) records.set(attendanceData.date, attendanceData);
+      const missing = dates.filter(date => !records.has(date));
+      for (let i = 0; i < missing.length; i += 4) {
+        const batch = await Promise.all(missing.slice(i, i + 4).map(async date => ({
+          date, result: await adminRequest("attendance", { date })
+        })));
+        batch.forEach(item => {
+          if (!item.result.ok) throw new Error(item.result.error || "request");
+          records.set(item.date, item.result.attendance);
+        });
+      }
+      const scouts = new Map();
+      const getScout = name => {
+        const key = String(name).normalize("NFC").toLocaleLowerCase();
+        if (!scouts.has(key)) scouts.set(key, { name, attended: 0, eligible: 0, absences: [] });
+        return scouts.get(key);
+      };
+      dates.forEach(date => {
+        const record = records.get(date);
+        const excused = new Set((record.excused || []).map(name => String(name).normalize("NFC").toLocaleLowerCase()));
+        const excuseReasons = new Map((record.excuses || []).map(item => [
+          String(item.name).normalize("NFC").toLocaleLowerCase(), String(item.reason || "")
+        ]));
+        const present = new Set();
+        record.present.forEach(entry => {
+          const key = String(entry.name).normalize("NFC").toLocaleLowerCase();
+          present.add(key);
+          const scout = getScout(entry.name);
+          scout.attended++;
+          scout.eligible++;
+        });
+        record.absent.forEach(name => {
+          const key = String(name).normalize("NFC").toLocaleLowerCase();
+          if (present.has(key)) return;
+          const scout = getScout(name);
+          scout.eligible++;
+          scout.absences.push({ date, excused: excused.has(key), reason: excuseReasons.get(key) || "" });
+        });
+      });
+      const sorted = [...scouts.values()].sort((a, b) =>
+        a.attended / a.eligible - b.attended / b.eligible || a.name.localeCompare(b.name)
+      );
+      $("summary-status").textContent = dates.length + " meeting(s)";
+      sorted.forEach(scout => {
+        const row = document.createElement("div");
+        row.className = "summary-row";
+        const top = document.createElement("div");
+        top.className = "summary-top";
+        const name = document.createElement("strong");
+        name.textContent = scout.name;
+        const rate = document.createElement("strong");
+        rate.textContent = "Attendance rate: " + Math.round(scout.attended / scout.eligible * 100) + "%";
+        top.append(name, rate);
+        const detail = document.createElement("div");
+        detail.className = "muted";
+        detail.textContent = "Attended " + scout.attended + " of " + scout.eligible + " meetings";
+        const absences = document.createElement("div");
+        absences.className = "muted";
+        absences.textContent = "Recent absences: " + (scout.absences.slice(0, 3)
+          .map(item => item.date + (item.excused
+            ? " (" + (item.reason ? "Excused: " + item.reason : "Excused without reason") + ")"
+            : "")).join(", ") || "None");
+        row.append(top, detail, absences);
+        $("summary-list").append(row);
+      });
+      if (!sorted.length) $("summary-status").textContent = "No meetings have been recorded.";
+    } catch (error) {
+      $("summary-status").textContent = "Could not build the attendance summary.";
+    } finally {
+      $("summary-open").disabled = false;
+      setButtonBusy($("summary-open"), false);
+    }
+  }
+
+  async function changeLeaderPassword(event) {
+    event.preventDefault();
+    const next = $("new-password").value;
+    if (next.length < 12 || next.length > 128 || next.trim() !== next) {
+      $("password-status").textContent = "Use 12–128 characters with no spaces at the beginning or end.";
+      return;
+    }
+    if (next !== $("confirm-password").value) {
+      $("password-status").textContent = "The passwords do not match.";
+      return;
+    }
+    $("change-password").disabled = true;
+    setButtonBusy($("change-password"), true);
+    $("password-status").textContent = "Changing password…";
+    try {
+      const result = await adminRequest("change_password", { newPassword: next });
+      if (!result.ok) {
+        $("password-status").textContent = result.error === "audit"
+          ? "The password change may have applied, but its audit record failed. Test the new display password."
+          : "Could not change the display password.";
+        return;
+      }
+      $("new-password").value = "";
+      $("confirm-password").value = "";
+      $("password-status").textContent = "Display password changed. The admin password is unchanged.";
+      await loadState($("date").value);
+    } catch (error) {
+      $("password-status").textContent = "Could not connect. Verify the display password before retrying.";
+    } finally {
+      $("change-password").disabled = false;
+      setButtonBusy($("change-password"), false);
+    }
+  }
+
+  function signOut() {
+    adminPassword = "";
+    clearInterval(tickTimer);
+    $("password").value = "";
+    $("dashboard").hidden = true;
+    $("login").hidden = false;
+    $("qr").replaceChildren();
+    qr = null;
+    status("");
+  }
+
+  $("login").addEventListener("submit", event => {
+    event.preventDefault();
+    adminPassword = $("password").value;
+    loadState(undefined, $("sign-in"));
+  });
+  $("refresh").addEventListener("click", () => loadState($("date").value, $("refresh")));
+  $("audit-refresh").addEventListener("click", () => loadState($("date").value, $("audit-refresh")));
+  $("logout").addEventListener("click", signOut);
+  $("roster").addEventListener("change", () => {
+    $("new-name").hidden = $("roster").value !== NEW;
+    if (!$("new-name").hidden) $("new-name").focus();
+  });
+  $("check-in").addEventListener("click", manualCheckin);
+  $("add-scout").addEventListener("click", addScout);
+  $("date").addEventListener("change", () => loadState($("date").value));
+  $("export").addEventListener("click", downloadCsv);
+  $("summary-open").addEventListener("click", loadSummary);
+  $("summary-back").addEventListener("click", () => {
+    $("summary").hidden = true;
+    $("daily-attendance").hidden = false;
+  });
+  $("password-form").addEventListener("submit", changeLeaderPassword);
+
+  // ---- Maintenance mode ----
+  let maintenanceOn = false;
+  function renderMaintenance(on) {
+    maintenanceOn = !!on;
+    $("maint-banner").hidden = !maintenanceOn;
+    const btn = $("maint-toggle");
+    btn.textContent = maintenanceOn ? "Turn off maintenance mode" : "Turn on maintenance mode";
+    btn.classList.toggle("danger", !maintenanceOn);
+    $("maint-status").textContent = maintenanceOn
+      ? "Maintenance mode is ON. The app is stopped for scouts and the display."
+      : "Maintenance mode is off. The app is running normally.";
+  }
+  async function setMaintenance(on) {
+    if (on && !confirm("Turn on maintenance mode? Scouts and the leader display will be blocked right away.")) return;
+    const buttons = [$("maint-toggle"), $("maint-off")];
+    buttons.forEach(b => { b.disabled = true; setButtonBusy(b, true); });
+    try {
+      const result = await adminRequest("set_maintenance", { on });
+      if (!result.ok) { $("maint-status").textContent = "Could not change maintenance mode. Update the Apps Script first."; return; }
+      renderMaintenance(result.maintenance);
+    } catch (error) {
+      $("maint-status").textContent = "Could not connect. Check the state and try again.";
+    } finally {
+      buttons.forEach(b => { b.disabled = false; setButtonBusy(b, false); });
+    }
+  }
+  $("maint-toggle").addEventListener("click", () => setMaintenance(!maintenanceOn));
+  $("maint-off").addEventListener("click", () => setMaintenance(false));
+  renderMaintenance(false);
+</script>
+<script>
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+<script>
+(() => {
+  const panes = { qr: "sec-qr", att: "sec-att", manual: "manual-section", audit: "audit-section", pw: "password-section" };
+  const tabs = document.querySelectorAll(".tab");
+  function go(name) {
+    Object.entries(panes).forEach(([k, id]) => { document.getElementById(id).hidden = k !== name; });
+    tabs.forEach(t => t.setAttribute("aria-selected", String(t.dataset.tab === name)));
+    scrollTo({ top: 0 });
+  }
+  tabs.forEach(t => t.addEventListener("click", () => go(t.dataset.tab)));
+  new MutationObserver(() => { if (document.getElementById("dashboard").hidden) go("qr"); })
+    .observe(document.getElementById("dashboard"), { attributes: true, attributeFilter: ["hidden"] });
+})();
+</script>
+
+</body>
+</html>
