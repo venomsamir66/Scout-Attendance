@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تسجيل الحضور بالموقع</title>
+<style>
+  :root {
+    --bg: #f3f5ef; --card: #ffffff; --ink: #1d2a1f; --muted: #5d6b60;
+    --green: #2f6b3a; --green-dark: #20502a; --red: #a4302a; --line: #d9dfd2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141a15; --card: #1d251e; --ink: #eaf0e6; --muted: #9fafa2;
+            --green: #5fb36e; --green-dark: #86cc93; --red: #e0776f; --line: #2f3b30; }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Segoe UI", Tahoma, "Noto Naskh Arabic", system-ui, sans-serif;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  main {
+    width: 100%; max-width: 420px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 14px; padding: 28px 22px; text-align: center;
+  }
+  h1 { font-size: 1.35rem; margin: 0 0 6px; }
+  p.sub { margin: 0 0 22px; color: var(--muted); font-size: .95rem; line-height: 1.6; }
+  #status { font-size: 1.05rem; line-height: 1.7; min-height: 3.4em; margin: 0 0 18px; }
+  #status.ok { color: var(--green); font-weight: 700; }
+  #status.bad { color: var(--red); }
+  select, button {
+    width: 100%; font: inherit; padding: 13px 14px; border-radius: 10px; margin-top: 10px;
+  }
+  select { background: var(--bg); color: var(--ink); border: 1px solid var(--line); }
+  button {
+    background: var(--green); color: #fff; border: 0; font-weight: 700; cursor: pointer;
+  }
+  button:hover { background: var(--green-dark); }
+  button.link {
+    background: none; color: var(--muted); font-weight: 400; text-decoration: underline;
+    padding: 8px; margin-top: 4px;
+  }
+  button:focus-visible, select:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>تسجيل الحضور بالموقع</h1>
+  <p class="sub">افتح هذه الصفحة في مكان الاجتماع وسيتم تسجيل حضورك تلقائيًا.</p>
+
+  <div id="status" role="status" aria-live="polite">جارٍ تحديد موقعك…</div>
+
+  <div id="picker" class="hidden">
+    <select id="nameSelect" aria-label="اختر اسمك"></select>
+    <button id="confirmBtn" type="button">تسجيل الحضور</button>
+  </div>
+
+  <button id="retryBtn" class="hidden" type="button">إعادة المحاولة</button>
+  <button id="changeBtn" class="link hidden" type="button">لست أنت؟ غيّر الاسم</button>
+</main>
+
+<script>
+// ───── SETTINGS ─────────────────────────────────────────────
+// Paste the SAME Apps Script web app URL (ends in /exec) your index.html uses.
+const API = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+// If your index.html stores its device ID under a specific localStorage key,
+// put that key here so both pages share one device ID. Otherwise leave as is.
+const DEVICE_KEY = 'scoutDeviceId';
+const NAME_KEY = 'geoScoutName';
+// ──────────────────────────────────────────────────────────────
+
+const MSG = {
+  locating: 'جارٍ تحديد موقعك…',
+  checking: 'جارٍ تسجيل الحضور…',
+  done: 'تم تسجيل حضورك ✓',
+  already: 'حضورك مسجّل مسبقًا اليوم ✓',
+  pick: 'اختر اسمك من القائمة',
+  denied: 'لم يتم السماح بالوصول إلى الموقع. فعّل الموقع للمتصفح ثم أعد المحاولة.',
+  unavailable: 'تعذّر تحديد موقعك. تأكد من تشغيل GPS ثم أعد المحاولة.',
+  timeout: 'استغرق تحديد الموقع وقتًا طويلًا. أعد المحاولة.',
+  nosupport: 'هذا المتصفح لا يدعم تحديد الموقع.',
+  network: 'تعذّر الاتصال بالخادم. تحقق من الإنترنت.',
+  geo_off: 'التسجيل بالموقع غير مفعّل حاليًا. اسأل القائد.',
+  geo_closed: 'انتهى وقت التسجيل بالموقع.',
+  outside: 'أنت لست في مكان الاجتماع.',
+  geo_inaccurate: 'دقة الموقع ضعيفة. اخرج إلى مكان مفتوح وأعد المحاولة.',
+  badloc: 'تعذّر قراءة الموقع. أعد المحاولة.',
+  locked: 'محاولات كثيرة. انتظر بضع دقائق ثم أعد المحاولة.',
+  device: 'هذا الجهاز سجّل حضور اسم آخر قبل قليل.',
+  notinroster: 'اسمك غير موجود في القائمة. اسأل القائد.',
+  maintenance: 'النظام تحت الصيانة حاليًا.',
+  fallback: 'حدث خطأ. أعد المحاولة.'
+};
+
+const $ = id => document.getElementById(id);
+const statusEl = $('status'), picker = $('picker'), select = $('nameSelect');
+const retryBtn = $('retryBtn'), changeBtn = $('changeBtn');
+
+function say(text, cls) { statusEl.textContent = text; statusEl.className = cls || ''; }
+function show(el, on) { el.classList.toggle('hidden', !on); }
+
+function safeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function safeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+function deviceId() {
+  let id = safeGet(DEVICE_KEY);
+  if (!id || id.length < 16) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    id = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    safeSet(DEVICE_KEY, id);
+  }
+  return id;
+}
+
+function getPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject({ code: 'nosupport' });
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy }),
+      e => reject({ code: e.code === 1 ? 'denied' : e.code === 3 ? 'timeout' : 'unavailable' }),
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    );
+  });
+}
+
+let pos = null;
+
+async function start() {
+  show(retryBtn, false); show(picker, false); show(changeBtn, false);
+  say(MSG.locating);
+  try {
+    pos = await getPosition();
+  } catch (e) {
+    say(MSG[e.code] || MSG.unavailable, 'bad'); show(retryBtn, true); return;
+  }
+
+  // The roster is only released to phones that are inside the meeting area.
+  let res;
+  try {
+    const q = new URLSearchParams({ action: 'georoster', lat: pos.lat, lon: pos.lon, accuracy: pos.accuracy });
+    res = await (await fetch(API + '?' + q)).json();
+  } catch (e) {
+    say(MSG.network, 'bad'); show(retryBtn, true); return;
+  }
+  if (!res.ok) { say(MSG[res.error] || MSG.fallback, 'bad'); show(retryBtn, true); return; }
+
+  const saved = safeGet(NAME_KEY);
+  const match = saved && res.names.find(n => n === saved);
+  if (match) { await checkIn(match); return; }
+
+  select.innerHTML = '';
+  const first = document.createElement('option');
+  first.value = ''; first.textContent = MSG.pick;
+  select.appendChild(first);
+  res.names.forEach(n => {
+    const o = document.createElement('option');
+    o.value = n; o.textContent = n; select.appendChild(o);
+  });
+  say(MSG.pick); show(picker, true);
+}
+
+async function checkIn(name) {
+  show(picker, false); show(changeBtn, false); show(retryBtn, false);
+  say(MSG.checking);
+  let res;
+  try {
+    const r = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight
+      body: JSON.stringify({
+        action: 'geocheckin', name: name, device: deviceId(),
+        lat: pos.lat, lon: pos.lon, accuracy: pos.accuracy,
+        browser: navigator.userAgent
+      })
+    });
+    res = await r.json();
+  } catch (e) {
+    say(MSG.network, 'bad'); show(retryBtn, true); return;
+  }
+  if (res.ok) {
+    safeSet(NAME_KEY, name);
+    say(res.duplicate ? MSG.already : MSG.done, 'ok');
+    show(changeBtn, true);
+  } else {
+    say(MSG[res.error] || MSG.fallback, 'bad');
+    show(retryBtn, true);
+    if (res.error === 'notinroster') safeSet(NAME_KEY, '');
+  }
+}
+
+$('confirmBtn').addEventListener('click', () => {
+  if (select.value) checkIn(select.value); else say(MSG.pick, 'bad');
+});
+retryBtn.addEventListener('click', start);
+changeBtn.addEventListener('click', () => { safeSet(NAME_KEY, ''); start(); });
+
+start();
+</script>
+</body>
+</html>
